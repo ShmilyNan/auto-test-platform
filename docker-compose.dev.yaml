@@ -1,0 +1,65 @@
+version: '3.8'
+
+# 开发环境配置
+# 使用方法: docker-compose -f docker-compose.dev.yaml up -d
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: autotest-postgres-dev
+    environment:
+      POSTGRES_USER: autotest_user
+      POSTGRES_PASSWORD: 776462
+      POSTGRES_DB: autotest_platform
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - autotest-dev-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: autotest-redis-dev
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_dev_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - autotest-dev-network
+    restart: unless-stopped
+
+  # 开发环境使用Adminer管理数据库（可选）
+  adminer:
+    image: adminer
+    container_name: autotest-adminer
+    ports:
+      - "8080:8080"
+    networks:
+      - autotest-dev-network
+    restart: unless-stopped
+
+  # Redis Commander（可选）
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: autotest-redis-commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    networks:
+      - autotest-dev-network
+    restart: unless-stopped
+
+networks:
+  autotest-dev-network:
+    driver: bridge
+
+volumes:
+  postgres_dev_data:
+    driver: local
+  redis_dev_data:
+    driver: local

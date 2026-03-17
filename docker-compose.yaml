@@ -1,0 +1,190 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # 数据库服务
+  # ============================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: autotest-postgres
+    environment:
+      POSTGRES_USER: autotest_user
+      POSTGRES_PASSWORD: 776462
+      POSTGRES_DB: autotest_platform
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U autotest_user -d autotest_platform"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - autotest-network
+    restart: unless-stopped
+
+  # ============================================
+  # Redis服务
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: autotest-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - autotest-network
+    restart: unless-stopped
+
+  # ============================================
+  # API服务
+  # ============================================
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: autotest-api
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://autotest_user:776462@postgres:5432/autotest_platform
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - SECRET_KEY=${SECRET_KEY:-your-super-secret-key-change-in-production}
+      - ENVIRONMENT=production
+      - DEBUG=false
+    volumes:
+      - ./logs:/app/logs
+      - ./storage:/tmp/storage
+      - test_results:/tmp/test_results
+      - allure_results:/tmp/allure_results
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - autotest-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # ============================================
+  # Celery Worker服务
+  # ============================================
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: autotest-celery-worker
+    command: celery -A scheduler worker --loglevel=info --concurrency=4
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://autotest_user:776462@postgres:5432/autotest_platform
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - SECRET_KEY=${SECRET_KEY:-your-super-secret-key-change-in-production}
+      - ENVIRONMENT=production
+      - DEBUG=false
+    volumes:
+      - ./logs:/app/logs
+      - test_results:/tmp/test_results
+      - allure_results:/tmp/allure_results
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - autotest-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 1G
+
+  # ============================================
+  # Celery Beat服务（定时任务调度）
+  # ============================================
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: autotest-celery-beat
+    command: celery -A scheduler beat --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://autotest_user:776462@postgres:5432/autotest_platform
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - SECRET_KEY=${SECRET_KEY:-your-super-secret-key-change-in-production}
+      - ENVIRONMENT=production
+      - DEBUG=false
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      - redis
+      - celery-worker
+    networks:
+      - autotest-network
+    restart: unless-stopped
+
+  # ============================================
+  # Nginx反向代理（可选，用于生产环境）
+  # ============================================
+  nginx:
+    image: nginx:alpine
+    container_name: autotest-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - api
+    networks:
+      - autotest-network
+    restart: unless-stopped
+    profiles:
+      - production
+
+# ============================================
+# 网络配置
+# ============================================
+networks:
+  autotest-network:
+    driver: bridge
+
+# ============================================
+# 数据卷配置
+# ============================================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  test_results:
+    driver: local
+  allure_results:
+    driver: local

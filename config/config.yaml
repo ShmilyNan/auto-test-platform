@@ -1,0 +1,87 @@
+# 应用配置
+app:
+  name: "自动化测试平台"
+  version: "1.0.0"
+  description: "模块化单体架构的自动化测试平台"
+  debug: false
+  environment: "dev"  # dev, prod
+
+# API配置
+api:
+  prefix: "/api/v1"
+  docs_url: "/docs"
+  redoc_url: "/redoc"
+  openapi_url: "/openapi.json"
+
+# 数据库配置
+database:
+  pool_size: 10
+  max_overflow: 20
+  pool_pre_ping: true
+  echo: false
+
+# Redis配置
+redis:
+  db_cache: 0
+  db_celery_broker: 1
+  db_celery_backend: 2
+
+# Celery配置
+celery:
+  worker_concurrency: 4
+  worker_prefetch_multiplier: 1
+  task_time_limit: 1800  # 30分钟
+  task_soft_time_limit: 1500  # 25分钟
+  result_expires: 86400  # 24小时
+
+# JWT配置
+jwt:
+  algorithm: "HS256"
+  access_token_expire_minutes: 30
+  refresh_token_expire_days: 7
+
+# 测试执行配置
+test_execution:
+  results_dir: "/tmp/test_results"
+  allure_results_dir: "/tmp/allure_results"
+  max_concurrent_executions: 5
+  default_timeout: 30
+  max_timeout: 600
+
+# 存储配置
+storage:
+  type: "local"  # local, oss, s3
+  path: "/tmp/storage"
+  # OSS配置（如果使用）
+  oss:
+    endpoint: ""
+    bucket_name: ""
+    access_key: ""
+    secret_key: ""
+
+# 日志配置
+logging:
+  level: "INFO"
+  format: "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
+  rotation: "100 MB"
+  retention: "30 days"
+  compression: "zip"
+  console_output: true
+  file_output: true
+  log_dir: "logs"
+
+# 定时任务配置
+schedule:
+  enabled: true
+  timezone: "Asia/Shanghai"
+
+# 分页配置
+pagination:
+  default_page_size: 20
+  max_page_size: 100
+
+# 限流配置
+rate_limit:
+  enabled: true
+  requests_per_minute: 60
+  burst: 10
