@@ -30,7 +30,7 @@ async def get_current_user_id(
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="无法验证凭据",
+        detail="无效token",
         headers={"WWW-Authenticate": "Bearer"},
     )
 

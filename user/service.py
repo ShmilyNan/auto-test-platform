@@ -3,6 +3,7 @@
 """
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
+from core.dependencies import get_current_user_id
 from user.interfaces import UserServiceInterface
 from user.models import User
 from user.schemas import UserCreate, UserUpdate, UserResponse
@@ -83,16 +84,87 @@ class UserService(UserServiceInterface):
 
         return UserResponse.model_validate(updated_user)
 
-    async def delete_user(self, user_id: int) -> bool:
-        """删除用户"""
+    async def delete_user(self, user_id: int) -> dict:
+        """
+        删除用户
+        Args:
+            user_id: 用户ID
+        Returns:
+            dict: 删除结果，包含success、message、username等信息
+        Raises:
+            ValueError: 各种删除失败的场景
+        """
         user = await self.repository.get_by_id(user_id)
         if not user:
-            return False
+            raise ValueError("用户不存在")
+        if user.is_superuser:
+            raise ValueError("超级管理员不能被删除")
+        if user.id == get_current_user_id():
+            raise ValueError("不能删除自己的账户")
 
+        try:
+            await self._check_user_dependencies(user_id)
+        except ValueError as e:
+            raise ValueError(f"无法删除用户: {str(e)}")
+
+        # 删除用户
         await self.repository.delete(user)
         logger.info(f"删除用户成功: {user.username}")
 
-        return True
+        return {
+            "success": True,
+            "message": "用户删除成功",
+            "user_id": user_id,
+            "username": user.username,
+            "detail": "用户已被成功删除，所有关联数据已清理"
+        }
+
+    async def _check_user_dependencies(self, user_id: int) -> None:
+        """
+        检查用户是否有关联数据
+        Args:
+            user_id: 用户ID
+        Raises:
+            ValueError: 如果用户有关联数据
+        """
+        from sqlalchemy import select, func
+        from project.models import Project
+        from testcase.models import TestCase
+        from plan.models import TestPlan, ExecutionRecord
+
+        async with self.repository.session as session:
+            # 检查用户是否为项目所有者
+            stmt = select(func.count()).select_from(Project).where(Project.owner_id == user_id)
+            result = await session.execute(stmt)
+            project_count = result.scalar()
+
+            if project_count > 0:
+                raise ValueError(f"用户是 {project_count} 个项目的所有者，请先转移项目所有权")
+
+            # 检查用户创建的测试用例
+            stmt = select(func.count()).select_from(TestCase).where(TestCase.created_by == user_id)
+            result = await session.execute(stmt)
+            case_count = result.scalar()
+
+            if case_count > 0:
+                # 可以选择转移或删除，这里只是警告
+                logger.warning(f"用户创建了 {case_count} 个测试用例")
+
+            # 检查用户创建的测试计划
+            stmt = select(func.count()).select_from(TestPlan).where(TestPlan.created_by == user_id)
+            result = await session.execute(stmt)
+            plan_count = result.scalar()
+
+            if plan_count > 0:
+                logger.warning(f"用户创建了 {plan_count} 个测试计划")
+
+            # 检查用户的执行记录
+            stmt = select(func.count()).select_from(ExecutionRecord).where(ExecutionRecord.triggered_by == user_id)
+            result = await session.execute(stmt)
+            execution_count = result.scalar()
+
+            if execution_count > 0:
+                logger.warning(f"用户有 {execution_count} 条执行记录")
 
     async def list_users(self, skip: int = 0, limit: int = 100) -> List[UserResponse]:
         """获取用户列表"""

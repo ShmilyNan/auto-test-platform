@@ -28,7 +28,7 @@ async def create_project(
     return project
 
 
-@router.get("/", response_model=List[ProjectResponse])
+@router.get("/", response_model=list[ProjectResponse])
 async def list_projects(
     skip: int = 0,
     limit: int = 100,
@@ -41,7 +41,7 @@ async def list_projects(
     return projects
 
 
-@router.get("/my", response_model=List[ProjectResponse])
+@router.get("/my", response_model=list[ProjectResponse])
 async def list_my_projects(
     current_user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session)
@@ -97,18 +97,87 @@ async def update_project(
     return project
 
 
-@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{project_id}",
+    response_model=DeleteProjectResponse,
+    responses={
+        200: {
+            "description": "项目删除成功",
+            "model": DeleteProjectResponse,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "项目删除成功",
+                        "project_id": 1,
+                        "project_name": "test_project",
+                        "detail": "项目已被成功删除，所有关联数据已清理"
+                    }
+                }
+            }
+        },
+        403: {
+            "description": "删除失败 - 当前账号无权限",
+            "model": DeleteProjectError,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": False,
+                        "message": "项目删除失败",
+                        "error_code": "FORBIDDEN",
+                        "detail": "需要项目管理员权限"
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "删除失败 - 项目不存在",
+            "model": DeleteProjectError,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": False,
+                        "message": "项目删除失败",
+                        "error_code": "PROJECT_NOT_FOUND",
+                        "detail": "项目ID 999 不存在"
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "删除失败 - 服务器内部错误",
+            "model": DeleteProjectError,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": False,
+                        "message": "项目删除失败",
+                        "error_code": "INTERNAL_ERROR",
+                        "detail": "删除项目时发生内部错误"
+                    }
+                }
+            }
+        }
+    }
+)
 async def delete_project(
     project_id: int,
     session: AsyncSession = Depends(get_session),
     current_user_id: int = Depends(get_current_user_id)
 ):
-    """删除项目"""
+    """
+    删除项目
+    **可能的错误场景：**
+    - 403: 无权限（非管理员/所有者）
+    - 404: 项目不存在
+    - 500: 服务器内部错误
+    """
     # 检查权限
     await check_project_permission(project_id, current_user_id, session, "admin")
 
     project_service = ProjectService(session)
     success = await project_service.delete_project(project_id)
+
 
     if not success:
         raise HTTPException(

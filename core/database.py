@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy import text
 from sqlalchemy.orm import declarative_base
-
 from core.config import settings
 from core.logger import logger
 

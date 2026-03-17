@@ -123,15 +123,15 @@ class Settings(BaseSettings):
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # 测试执行配置
-    ALLURE_RESULTS_DIR: str = ALLURE_RESULTS_DIR
-    ALLURE_REPORT_DIR: str = ALLURE_REPORT_DIR
+    ALLURE_RESULTS_DIR: str = str(ALLURE_RESULTS_DIR)
+    ALLURE_REPORT_DIR: str = str(ALLURE_REPORT_DIR)
     MAX_CONCURRENT_EXECUTIONS: int = 5
     DEFAULT_TIMEOUT: int = DEFAULT_TIMEOUT
     MAX_TIMEOUT: int = MAX_TIMEOUT
 
     # 存储配置
     STORAGE_TYPE: str = StorageType.LOCAL.value
-    STORAGE_PATH: str = STORAGE_PATH
+    STORAGE_PATH: str = str(STORAGE_PATH)
 
     # 日志配置
     LOG_LEVEL: str = "INFO"
@@ -207,8 +207,8 @@ class Settings(BaseSettings):
 
         # 测试执行配置
         test_config = yaml_config.get("test_execution", {})
-        self.TEST_RESULTS_DIR = test_config.get("results_dir", self.TEST_RESULTS_DIR)
         self.ALLURE_RESULTS_DIR = test_config.get("allure_results_dir", self.ALLURE_RESULTS_DIR)
+        self.ALLURE_REPORT_DIR = test_config.get("allure_report_dir", self.ALLURE_REPORT_DIR)
         self.MAX_CONCURRENT_EXECUTIONS = test_config.get("max_concurrent_executions", self.MAX_CONCURRENT_EXECUTIONS)
         self.DEFAULT_TIMEOUT = test_config.get("default_timeout", self.DEFAULT_TIMEOUT)
         self.MAX_TIMEOUT = test_config.get("max_timeout", self.MAX_TIMEOUT)

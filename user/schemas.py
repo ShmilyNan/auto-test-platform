@@ -2,7 +2,7 @@
 用户相关的Pydantic模型
 """
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 
@@ -29,6 +29,7 @@ class UserResponse(UserBase):
     """用户响应模型"""
     id: int
     role: str
+    is_superuser: bool = False
     is_active: bool
     created_at: datetime
     updated_at: Optional[datetime] = None
@@ -54,3 +55,41 @@ class LoginRequest(BaseModel):
     """登录请求模型"""
     username: str
     password: str
+
+
+class DeleteUserResponse(BaseModel):
+    """删除用户响应模型"""
+    success: bool
+    message: str
+    user_id: int
+    username: Optional[str] = None
+    detail: Optional[str] = None
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "message": "用户删除成功",
+                "user_id": 1,
+                "username": "testuser",
+                "detail": "用户已被成功删除，所有关联数据已清理"
+            }
+        }
+
+
+class DeleteUserError(BaseModel):
+    """删除用户错误响应模型"""
+    success: bool = False
+    message: str
+    error_code: str
+    detail: str
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "success": False,
+                "message": "用户删除失败",
+                "error_code": "USER_NOT_FOUND",
+                "detail": "用户ID 999 不存在"
+            }
+        }
