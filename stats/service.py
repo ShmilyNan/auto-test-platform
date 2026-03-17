@@ -2,7 +2,7 @@
 统计服务层
 """
 from typing import Dict, Any, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import select, func, and_
 
 from stats.interfaces import StatsServiceInterface
@@ -42,7 +42,7 @@ class StatsService(StatsServiceInterface):
             )
             
             # 最近7天的通过率
-            seven_days_ago = datetime.utcnow() - timedelta(days=7)
+            seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
             recent_executions = await session.execute(
                 select(ExecutionRecord)
                 .where(and_(
@@ -78,7 +78,7 @@ class StatsService(StatsServiceInterface):
             trend = []
             
             for i in range(days):
-                date = datetime.utcnow().date() - timedelta(days=i)
+                date = datetime.now(timezone.utc).date() - timedelta(days=i)
                 date_start = datetime.combine(date, datetime.min.time())
                 date_end = datetime.combine(date, datetime.max.time())
                 
@@ -111,7 +111,7 @@ class StatsService(StatsServiceInterface):
             trend = []
             
             for i in range(days):
-                date = datetime.utcnow().date() - timedelta(days=i)
+                date = datetime.now(timezone.utc).date() - timedelta(days=i)
                 date_start = datetime.combine(date, datetime.min.time())
                 date_end = datetime.combine(date, datetime.max.time())
                 
@@ -193,7 +193,7 @@ class StatsService(StatsServiceInterface):
         from plan.models import ExecutionRecord, TestPlan
         
         async with async_session_maker() as session:
-            seven_days_ago = datetime.utcnow() - timedelta(days=days)
+            seven_days_ago = datetime.now(timezone.utc) - timedelta(days=days)
             
             result = await session.execute(
                 select(ExecutionRecord, TestPlan)

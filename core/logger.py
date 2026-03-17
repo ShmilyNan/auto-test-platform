@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 from loguru import logger
-from config.config import settings
+from core.config import settings
 
 # 移除默认的handler
 logger.remove()

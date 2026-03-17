@@ -2,7 +2,7 @@
 统计相关的Pydantic模型
 """
 from pydantic import BaseModel
-from typing import List, Dict, Any
+from typing import Dict
 from datetime import datetime
 
 

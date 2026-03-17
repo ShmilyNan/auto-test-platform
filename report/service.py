@@ -8,7 +8,7 @@ import shutil
 
 from report.interfaces import ReportServiceInterface
 from core.logger import get_logger
-from config.config import settings
+from core.config import settings
 from core.database import async_session_maker
 
 logger = get_logger(__name__)

@@ -2,7 +2,7 @@
 执行引擎模块接口定义
 """
 from abc import ABC, abstractmethod
-from typing import Optional, List, Dict, Any
+from typing import List, Dict, Any
 
 
 class ExecutorServiceInterface(ABC):

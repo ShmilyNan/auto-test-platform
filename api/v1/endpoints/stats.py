@@ -3,8 +3,6 @@
 """
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Dict, Any, List
-
 from core.database import get_session
 from stats.service import StatsService
 

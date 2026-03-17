@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy import text
 from sqlalchemy.orm import declarative_base
 
-from config.config import settings
+from core.config import settings
 from core.logger import logger
 
 # 创建异步引擎 - 根据数据库类型配置参数

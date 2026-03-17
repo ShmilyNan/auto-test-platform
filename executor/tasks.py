@@ -2,7 +2,7 @@
 Celery任务定义
 """
 from celery import Celery
-from config.config import settings
+from core.config import settings
 from core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -30,7 +30,7 @@ celery_app.conf.update(
 
 
 @celery_app.task(bind=True)
-def execute_test_task(self, execution_id: int):
+def execute_test_task(execution_id: int):
     """执行测试任务"""
     import asyncio
     from executor.service import ExecutorService
@@ -54,7 +54,7 @@ def execute_test_task(self, execution_id: int):
 
 
 @celery_app.task(bind=True)
-def generate_report_task(self, execution_id: int):
+def generate_report_task(execution_id: int):
     """生成报告任务"""
     import asyncio
     from report.service import ReportService

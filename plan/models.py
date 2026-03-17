@@ -72,3 +72,35 @@ class ExecutionRecord(Base):
     
     def __repr__(self):
         return f"<ExecutionRecord(id={self.id}, plan_id={self.plan_id}, status='{self.status}')>"
+
+
+class ExecutionResult(Base):
+    """执行结果详情表 - 存储每个测试用例的执行结果"""
+    __tablename__ = "execution_results"
+
+    id = Column(Integer, primary_key=True, index=True)
+    execution_id = Column(Integer, ForeignKey("execution_records.id", ondelete="CASCADE"), nullable=False, index=True)
+    case_id = Column(Integer, ForeignKey("test_cases.id", ondelete="SET NULL"), nullable=True, index=True)
+    case_name = Column(String(200), nullable=False)  # 用例名称快照
+
+    # 执行状态
+    status = Column(String(20), default="pending", nullable=False)  # pending, passed, failed, skipped
+    duration = Column(Integer, nullable=True)  # 执行时长（毫秒）
+
+    # 请求响应详情
+    request = Column(JSON, nullable=True)  # 请求快照
+    response = Column(JSON, nullable=True)  # 响应快照
+
+    # 断言结果
+    assertions = Column(JSON,
+                        nullable=True)  # [{"type": "status_code", "expected": 200, "actual": 200, "passed": true}]
+
+    # 错误信息
+    error_message = Column(Text, nullable=True)
+    stack_trace = Column(Text, nullable=True)
+
+    # 元数据
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    def __repr__(self):
+        return f"<ExecutionResult(id={self.id}, case_name='{self.case_name}', status='{self.status}')>"

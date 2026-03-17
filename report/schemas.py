@@ -2,7 +2,7 @@
 报告相关的Pydantic模型
 """
 from pydantic import BaseModel
-from typing import Optional, Dict, Any, List
+from typing import Optional, List
 from datetime import datetime
 
 

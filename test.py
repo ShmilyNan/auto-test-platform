@@ -1,4 +1,4 @@
-from config.config import settings
+from core.config import settings
 # from config.constants import *
 
 

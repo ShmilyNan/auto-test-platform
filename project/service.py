@@ -43,13 +43,13 @@ class ProjectService(ProjectServiceInterface):
         
         logger.info(f"创建项目成功: {created_project.name}")
         
-        return ProjectResponse.from_orm(created_project)
+        return ProjectResponse.model_validate(created_project)
     
     async def get_project(self, project_id: int) -> Optional[ProjectResponse]:
         """获取项目"""
         project = await self.project_repo.get_by_id(project_id)
         if project:
-            return ProjectResponse.from_orm(project)
+            return ProjectResponse.model_validate(project)
         return None
     
     async def update_project(self, project_id: int, project_data: ProjectUpdate) -> Optional[ProjectResponse]:
@@ -69,7 +69,7 @@ class ProjectService(ProjectServiceInterface):
         updated_project = await self.project_repo.update(project)
         logger.info(f"更新项目成功: {updated_project.name}")
         
-        return ProjectResponse.from_orm(updated_project)
+        return ProjectResponse.model_validate(updated_project)
     
     async def delete_project(self, project_id: int) -> bool:
         """删除项目"""
@@ -85,7 +85,7 @@ class ProjectService(ProjectServiceInterface):
     async def list_projects(self, skip: int = 0, limit: int = 100) -> List[ProjectResponse]:
         """获取项目列表"""
         projects = await self.project_repo.list(skip, limit)
-        return [ProjectResponse.from_orm(project) for project in projects]
+        return [ProjectResponse.model_validate(project) for project in projects]
     
     async def list_user_projects(self, user_id: int) -> List[ProjectResponse]:
         """获取用户的项目列表"""
@@ -100,7 +100,7 @@ class ProjectService(ProjectServiceInterface):
         for project in member_projects:
             all_projects[project.id] = project
         
-        return [ProjectResponse.from_orm(project) for project in all_projects.values()]
+        return [ProjectResponse.model_validate(project) for project in all_projects.values()]
     
     async def add_member(self, project_id: int, member_data: ProjectMemberCreate) -> ProjectMemberResponse:
         """添加项目成员"""
@@ -120,7 +120,7 @@ class ProjectService(ProjectServiceInterface):
         created_member = await self.member_repo.create(member)
         logger.info(f"添加项目成员成功: project_id={project_id}, user_id={member_data.user_id}")
         
-        return ProjectMemberResponse.from_orm(created_member)
+        return ProjectMemberResponse.model_validate(created_member)
     
     async def remove_member(self, project_id: int, user_id: int) -> bool:
         """移除项目成员"""
@@ -143,9 +143,9 @@ class ProjectService(ProjectServiceInterface):
         updated_member = await self.member_repo.update(member)
         logger.info(f"更新成员角色成功: project_id={project_id}, user_id={user_id}, role={role}")
         
-        return ProjectMemberResponse.from_orm(updated_member)
+        return ProjectMemberResponse.model_validate(updated_member)
     
     async def list_members(self, project_id: int) -> List[ProjectMemberResponse]:
         """获取项目成员列表"""
         members = await self.member_repo.list_by_project(project_id)
-        return [ProjectMemberResponse.from_orm(member) for member in members]
+        return [ProjectMemberResponse.model_validate(member) for member in members]

@@ -31,10 +31,10 @@ class ProjectResponse(ProjectBase):
     is_active: bool
     created_at: datetime
     updated_at: Optional[datetime] = None
-    
-    class Config:
-        from_attributes = True
 
+    model_config = {
+        "from_attributes": True
+    }
 
 class ProjectMemberBase(BaseModel):
     """项目成员基础模型"""
@@ -52,10 +52,10 @@ class ProjectMemberResponse(ProjectMemberBase):
     id: int
     project_id: int
     joined_at: datetime
-    
-    class Config:
-        from_attributes = True
 
+    model_config = {
+        "from_attributes": True
+    }
 
 class ProjectWithMembers(ProjectResponse):
     """项目详情（包含成员）"""

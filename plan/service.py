@@ -13,7 +13,7 @@ from plan.schemas import (
 )
 from plan.repository import TestPlanRepository, ExecutionRecordRepository
 from core.logger import get_logger
-from config.config import settings
+from core.config import settings
 
 logger = get_logger(__name__)
 
@@ -42,13 +42,13 @@ class PlanService(PlanServiceInterface):
         created_plan = await self.plan_repo.create(plan)
         logger.info(f"创建测试计划成功: {created_plan.name}")
         
-        return TestPlanResponse.from_orm(created_plan)
+        return TestPlanResponse.model_validate(created_plan)
     
     async def get_plan(self, plan_id: int) -> Optional[TestPlanResponse]:
         """获取测试计划"""
         plan = await self.plan_repo.get_by_id(plan_id)
         if plan:
-            return TestPlanResponse.from_orm(plan)
+            return TestPlanResponse.model_validate(plan)
         return None
     
     async def update_plan(self, plan_id: int, plan_data: TestPlanUpdate) -> Optional[TestPlanResponse]:
@@ -58,14 +58,14 @@ class PlanService(PlanServiceInterface):
             return None
         
         # 更新字段
-        update_data = plan_data.dict(exclude_unset=True)
+        update_data = plan_data.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(plan, field, value)
         
         updated_plan = await self.plan_repo.update(plan)
         logger.info(f"更新测试计划成功: {updated_plan.name}")
         
-        return TestPlanResponse.from_orm(updated_plan)
+        return TestPlanResponse.model_validate(updated_plan)
     
     async def delete_plan(self, plan_id: int) -> bool:
         """删除测试计划"""
@@ -81,7 +81,7 @@ class PlanService(PlanServiceInterface):
     async def list_plans(self, project_id: int, skip: int = 0, limit: int = 100) -> List[TestPlanResponse]:
         """获取测试计划列表"""
         plans = await self.plan_repo.list_by_project(project_id, skip, limit)
-        return [TestPlanResponse.from_orm(plan) for plan in plans]
+        return [TestPlanResponse.model_validate(plan) for plan in plans]
     
     async def run_plan(self, plan_id: int, user_id: int) -> ExecutionRecordResponse:
         """执行测试计划"""
@@ -107,16 +107,16 @@ class PlanService(PlanServiceInterface):
         # from executor.tasks import execute_test_task
         # execute_test_task.delay(created_execution.id)
         
-        return ExecutionRecordResponse.from_orm(created_execution)
+        return ExecutionRecordResponse.model_validate(created_execution)
     
     async def get_execution(self, execution_id: int) -> Optional[ExecutionRecordResponse]:
         """获取执行记录"""
         execution = await self.execution_repo.get_by_id(execution_id)
         if execution:
-            return ExecutionRecordResponse.from_orm(execution)
+            return ExecutionRecordResponse.model_validate(execution)
         return None
     
     async def list_executions(self, plan_id: int, skip: int = 0, limit: int = 100) -> List[ExecutionRecordResponse]:
         """获取执行记录列表"""
         executions = await self.execution_repo.list_by_plan(plan_id, skip, limit)
-        return [ExecutionRecordResponse.from_orm(execution) for execution in executions]
+        return [ExecutionRecordResponse.model_validate(execution) for execution in executions]

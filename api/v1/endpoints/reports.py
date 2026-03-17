@@ -3,8 +3,6 @@
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Dict, Any
-
 from core.database import get_session
 from report.service import ReportService
 

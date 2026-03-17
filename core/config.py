@@ -3,36 +3,38 @@
 支持从 config.yaml、pyproject.toml 和 .env 文件加载配置
 配置优先级: 环境变量 > .env > config.yaml > 默认值
 """
+from typing import Any, Dict
 from functools import lru_cache
-from typing import Union, Dict, Any
+from ruamel.yaml import YAML
+import toml
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from config.constants import *
-from ruamel.yaml import YAML, YAMLError
+from .constants import *
 
-# 创建 YAML 实例
-_yaml = YAML(typ='rt')
+_yaml = YAML(typ="safe")
 _yaml.default_flow_style = False
 _yaml.allow_unicode = True
 _yaml.preserve_quotes = True
 _yaml.sort_keys = False
 
 
-def load_yaml_dict(file_path: Union[str, Path]) -> Dict[str, Any]:
-    """
-    加载YAML文件为字典
-    :param file_path: YAML文件路径
-    :return: YAML文件内容
-    """
-    try:
-        if not file_path:
-            raise ValueError("File path cannot be empty")
-        with open(file_path, "r", encoding="utf-8") as f:
-            return _yaml.load(f)
-    except YAMLError as e:
-        raise ValueError(f"Failed to load YAML file: {file_path}") from e
-    except Exception as e:
-        raise ValueError(f"Failed to load YAML file: {file_path}") from e
+def load_yaml_config() -> Dict[str, Any]:
+    """加载YAML配置文件"""
+    config_path = Path("config.yaml")
+    if config_path.exists():
+        with open(config_path, "r", encoding="utf-8") as f:
+            return _yaml.load(f) or {}
+    return {}
+
+
+def load_toml_config() -> Dict[str, Any]:
+    """加载TOML配置文件"""
+    config_path = Path("pyproject.toml")
+    if config_path.exists():
+        with open(config_path, "r", encoding="utf-8") as f:
+            return toml.load(f) or {}
+    return {}
+
 
 class Settings(BaseSettings):
     """应用配置"""
@@ -76,7 +78,7 @@ class Settings(BaseSettings):
 
     # 环境
     ENVIRONMENT: str = Field(
-        default=ENV_DEVELOPMENT,
+        default=Environment.DEVELOPMENT.value,
         description="运行环境"
     )
     DEBUG: bool = Field(
@@ -121,15 +123,15 @@ class Settings(BaseSettings):
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # 测试执行配置
-    TEST_RESULTS_DIR: str = "/tmp/test_results"
-    ALLURE_RESULTS_DIR: str = "/tmp/allure_results"
+    ALLURE_RESULTS_DIR: str = ALLURE_RESULTS_DIR
+    ALLURE_REPORT_DIR: str = ALLURE_REPORT_DIR
     MAX_CONCURRENT_EXECUTIONS: int = 5
     DEFAULT_TIMEOUT: int = DEFAULT_TIMEOUT
     MAX_TIMEOUT: int = MAX_TIMEOUT
 
     # 存储配置
-    STORAGE_TYPE: str = STORAGE_TYPE_LOCAL
-    STORAGE_PATH: str = "/tmp/storage"
+    STORAGE_TYPE: str = StorageType.LOCAL.value
+    STORAGE_PATH: str = STORAGE_PATH
 
     # 日志配置
     LOG_LEVEL: str = "INFO"
@@ -160,7 +162,7 @@ class Settings(BaseSettings):
 
     def _load_yaml_config(self):
         """从YAML文件加载配置"""
-        yaml_config = load_yaml_dict(CONFIG_FILE)
+        yaml_config = load_yaml_config()
 
         # 应用配置
         app_config = yaml_config.get("app", {})
@@ -246,17 +248,17 @@ class Settings(BaseSettings):
     @property
     def is_development(self) -> bool:
         """是否开发环境"""
-        return self.ENVIRONMENT == ENV_DEVELOPMENT
+        return self.ENVIRONMENT == Environment.DEVELOPMENT.value
 
     @property
     def is_production(self) -> bool:
         """是否生产环境"""
-        return self.ENVIRONMENT == ENV_PRODUCTION
+        return self.ENVIRONMENT == Environment.PRODUCTION.value
 
     @property
     def is_staging(self) -> bool:
         """是否预发布环境"""
-        return self.ENVIRONMENT == ENV_STAGING
+        return self.ENVIRONMENT == Environment.STAGING.value
 
 
 @lru_cache()

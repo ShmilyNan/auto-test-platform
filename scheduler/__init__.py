@@ -5,7 +5,7 @@
 from typing import Dict
 from celery import Celery
 from celery.schedules import crontab
-from config.config import settings
+from core.config import settings
 from core.logger import logger
 
 # 创建Celery应用

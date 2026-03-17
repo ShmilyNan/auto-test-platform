@@ -3,10 +3,7 @@
 """
 from abc import ABC, abstractmethod
 from typing import Optional, List
-from plan.schemas import (
-    TestPlanCreate, TestPlanUpdate, TestPlanResponse,
-    ExecutionRecordCreate, ExecutionRecordResponse
-)
+from plan.schemas import TestPlanCreate, TestPlanUpdate, TestPlanResponse, ExecutionRecordResponse
 
 
 class PlanServiceInterface(ABC):

@@ -45,13 +45,13 @@ class TestCaseService(TestCaseServiceInterface):
         created_case = await self.case_repo.create(case)
         logger.info(f"创建测试用例成功: {created_case.name}")
         
-        return TestCaseResponse.from_orm(created_case)
+        return TestCaseResponse.model_validate(created_case)
     
     async def get_case(self, case_id: int) -> Optional[TestCaseResponse]:
         """获取测试用例"""
         case = await self.case_repo.get_by_id(case_id)
         if case:
-            return TestCaseResponse.from_orm(case)
+            return TestCaseResponse.model_validate(case)
         return None
     
     async def update_case(self, case_id: int, case_data: TestCaseUpdate) -> Optional[TestCaseResponse]:
@@ -61,14 +61,14 @@ class TestCaseService(TestCaseServiceInterface):
             return None
         
         # 更新字段
-        update_data = case_data.dict(exclude_unset=True)
+        update_data = case_data.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(case, field, value)
         
         updated_case = await self.case_repo.update(case)
         logger.info(f"更新测试用例成功: {updated_case.name}")
         
-        return TestCaseResponse.from_orm(updated_case)
+        return TestCaseResponse.model_validate(updated_case)
     
     async def delete_case(self, case_id: int) -> bool:
         """删除测试用例"""
@@ -84,12 +84,12 @@ class TestCaseService(TestCaseServiceInterface):
     async def list_cases(self, project_id: int, skip: int = 0, limit: int = 100) -> List[TestCaseResponse]:
         """获取测试用例列表"""
         cases = await self.case_repo.list_by_project(project_id, skip, limit)
-        return [TestCaseResponse.from_orm(case) for case in cases]
+        return [TestCaseResponse.model_validate(case) for case in cases]
     
     async def get_cases_by_ids(self, case_ids: List[int]) -> List[TestCaseResponse]:
         """根据ID列表获取测试用例"""
         cases = await self.case_repo.get_by_ids(case_ids)
-        return [TestCaseResponse.from_orm(case) for case in cases]
+        return [TestCaseResponse.model_validate(case) for case in cases]
     
     async def create_suite(self, suite_data: TestSuiteCreate, user_id: int) -> TestSuiteResponse:
         """创建测试用例集"""
@@ -104,13 +104,13 @@ class TestCaseService(TestCaseServiceInterface):
         created_suite = await self.suite_repo.create(suite)
         logger.info(f"创建测试用例集成功: {created_suite.name}")
         
-        return TestSuiteResponse.from_orm(created_suite)
+        return TestSuiteResponse.model_validate(created_suite)
     
     async def get_suite(self, suite_id: int) -> Optional[TestSuiteResponse]:
         """获取测试用例集"""
         suite = await self.suite_repo.get_by_id(suite_id)
         if suite:
-            return TestSuiteResponse.from_orm(suite)
+            return TestSuiteResponse.model_validate(suite)
         return None
     
     async def update_suite(self, suite_id: int, suite_data: TestSuiteUpdate) -> Optional[TestSuiteResponse]:
@@ -120,14 +120,14 @@ class TestCaseService(TestCaseServiceInterface):
             return None
         
         # 更新字段
-        update_data = suite_data.dict(exclude_unset=True)
+        update_data = suite_data.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(suite, field, value)
         
         updated_suite = await self.suite_repo.update(suite)
         logger.info(f"更新测试用例集成功: {updated_suite.name}")
         
-        return TestSuiteResponse.from_orm(updated_suite)
+        return TestSuiteResponse.model_validate(updated_suite)
     
     async def delete_suite(self, suite_id: int) -> bool:
         """删除测试用例集"""
@@ -143,4 +143,4 @@ class TestCaseService(TestCaseServiceInterface):
     async def list_suites(self, project_id: int, skip: int = 0, limit: int = 100) -> List[TestSuiteResponse]:
         """获取测试用例集列表"""
         suites = await self.suite_repo.list_by_project(project_id, skip, limit)
-        return [TestSuiteResponse.from_orm(suite) for suite in suites]
+        return [TestSuiteResponse.model_validate(suite) for suite in suites]

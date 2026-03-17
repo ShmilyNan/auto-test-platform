@@ -40,9 +40,10 @@ class TestPlanResponse(TestPlanBase):
     created_by: int
     created_at: datetime
     updated_at: Optional[datetime] = None
-    
-    class Config:
-        from_attributes = True
+
+    model_config = {
+        "from_attributes": True
+    }
 
 
 class ExecutionRecordBase(BaseModel):
@@ -77,10 +78,10 @@ class ExecutionRecordResponse(BaseModel):
     summary: Optional[Dict[str, Any]] = None
     error_message: Optional[str] = None
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
 
+    model_config = {
+        "from_attributes": True
+    }
 
 class ExecutionSummary(BaseModel):
     """执行摘要模型"""
