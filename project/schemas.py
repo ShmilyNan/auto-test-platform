@@ -60,3 +60,41 @@ class ProjectMemberResponse(ProjectMemberBase):
 class ProjectWithMembers(ProjectResponse):
     """项目详情（包含成员）"""
     members: List[ProjectMemberResponse] = []
+
+
+class DeleteProjectResponse(BaseModel):
+    """删除项目响应模型"""
+    success: bool
+    message: str
+    project_id: int
+    project_name: Optional[str] = None
+    detail: Optional[str] = None
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "message": "项目删除成功",
+                "project_id": 1,
+                "project_name": "test_project",
+                "detail": "项目已被成功删除，所有关联数据已清理"
+            }
+        }
+
+
+class DeleteProjectError(BaseModel):
+    """删除项目错误响应模型"""
+    success: bool = False
+    message: str
+    error_code: str
+    detail: str
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "success": False,
+                "message": "项目删除失败",
+                "error_code": "PROJECT_NOT_FOUND",
+                "detail": "项目ID 999 不存在"
+            }
+        }

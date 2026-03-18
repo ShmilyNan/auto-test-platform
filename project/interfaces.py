@@ -3,7 +3,13 @@
 """
 from abc import ABC, abstractmethod
 from typing import Optional, List
-from project.schemas import ProjectCreate, ProjectUpdate, ProjectResponse, ProjectMemberCreate, ProjectMemberResponse
+from project.schemas import (
+    ProjectCreate,
+    ProjectUpdate,
+    ProjectResponse,
+    ProjectMemberCreate,
+    ProjectMemberResponse
+)
 
 
 class ProjectServiceInterface(ABC):
@@ -25,7 +31,7 @@ class ProjectServiceInterface(ABC):
         pass
     
     @abstractmethod
-    async def delete_project(self, project_id: int) -> bool:
+    async def delete_project(self, project_id: int) -> dict:
         """删除项目"""
         pass
     

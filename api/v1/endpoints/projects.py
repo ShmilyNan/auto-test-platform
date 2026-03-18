@@ -9,7 +9,8 @@ from core.dependencies import get_current_user, get_current_user_id, check_proje
 from project.service import ProjectService
 from project.schemas import (
     ProjectCreate, ProjectUpdate, ProjectResponse,
-    ProjectMemberCreate, ProjectMemberResponse
+    ProjectMemberCreate, ProjectMemberResponse,
+    DeleteProjectResponse, DeleteProjectError
 )
 from user.schemas import UserResponse
 
@@ -176,13 +177,43 @@ async def delete_project(
     await check_project_permission(project_id, current_user_id, session, "admin")
 
     project_service = ProjectService(session)
-    success = await project_service.delete_project(project_id)
+    try:
+        result = await project_service.delete_project(project_id)
+        return result
+    except ValueError as e:
+        error_msg = str(e)
 
-
-    if not success:
+        if "不存在" in error_msg:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "success": False,
+                    "message": "项目删除失败",
+                    "error_code": "PROJECT_NOT_FOUND",
+                    "detail": error_msg,
+                },
+            )
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="项目不存在"
+            status_code = status.HTTP_400_BAD_REQUEST,
+            detail = {
+                "success": False,
+                "message": "项目删除失败",
+                "error_code": "BUSINESS_ERROR",
+                "detail": error_msg,
+            },
+        )
+    except Exception as e:
+        from core.logger import logger
+
+        logger.error(f"删除项目异常: project_id={project_id}, error={str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "success": False,
+                "message": "项目删除失败",
+                "error_code": "INTERNAL_ERROR",
+                "detail": "删除项目时发生内部错误，请稍后重试",
+            },
         )
 
 
