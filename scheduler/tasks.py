@@ -6,9 +6,7 @@ import os
 import shutil
 from datetime import datetime, timedelta, timezone
 from celery import shared_task
-from fastapi import Depends
 from core.config import settings
-from core.dependencies import get_current_user_id
 from core.logger import logger
 from core.database import async_session_maker
 
@@ -36,40 +34,25 @@ def check_and_execute_scheduled_plans():
             from sqlalchemy import select
 
             stmt = select(TestPlan).where(
-                TestPlan.schedule_type == "scheduled",
-                TestPlan.is_active == True
+                TestPlan.enabled.is_(True),
+                TestPlan.cron_expression.is_not(None)
             )
             result = await session.execute(stmt)
             plans = result.scalars().all()
 
-            current_time = datetime.now(timezone.utc)
+            current_time = datetime.now(timezone.utc).replace(microsecond=0, second=0)
 
             for plan in plans:
-                if not plan.cron_expression:
-                    continue
-
                 try:
-                    # 解析cron表达式
                     from croniter import croniter
-                    cron = croniter(plan.cron_expression, plan.last_run_at or current_time)
 
-                    # 检查是否应该执行
-                    next_run = cron.get_next(datetime)
+                    if not croniter.match(plan.cron_expression, current_time):
+                        continue
 
-                    if next_run <= current_time:
-                        logger.info(f"执行定时计划: {plan.name}")
-
-                        # 创建执行记录并执行
-                        user_id = Depends(get_current_user_id)
-                        execution = await plan_service.run_plan(plan.id, user_id)
-
-                        # 异步执行测试任务
-                        from executor.tasks import execute_test_task
-                        execute_test_task.delay(execution.id)
-
-                        # 更新最后执行时间
-                        plan.last_run_at = current_time
-                        await session.commit()
+                    logger.info(f"执行定时计划: {plan.name}")
+                    execution = await plan_service.run_plan(plan.id, plan.created_by)
+                    from executor.tasks import dispatch_test_execution
+                    dispatch_test_execution(execution.id)
                 except Exception as e:
                     logger.error(f"执行定时计划 {plan.name} 失败: {e}")
 

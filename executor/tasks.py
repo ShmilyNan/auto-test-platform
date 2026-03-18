@@ -1,6 +1,7 @@
 """
 Celery任务定义
 """
+import asyncio
 from celery import Celery
 from core.config import settings
 from core.logger import get_logger
@@ -27,6 +28,40 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,
     worker_max_tasks_per_child=100
 )
+
+
+async def execute_test_task_local(execution_id: int):
+    """在当前进程中直接执行测试任务。"""
+    from executor.service import ExecutorService
+
+    logger.info(f"使用本地回退方式执行测试任务: execution_id={execution_id}")
+    executor = ExecutorService()
+    return await executor.execute(execution_id)
+
+
+def dispatch_test_execution(execution_id: int, background_tasks=None) -> str:
+    """分发测试执行任务；当Celery不可用时回退到当前进程后台执行。"""
+    try:
+        task_result = execute_test_task.delay(execution_id)
+        task_id = getattr(task_result, "id", None)
+        logger.info(f"测试任务已提交到Celery: execution_id={execution_id}, task_id={task_id}")
+        return "celery"
+    except Exception as exc:
+        logger.warning(
+            f"Celery分发测试任务失败，回退到本地后台执行: execution_id={execution_id}, error={exc}"
+        )
+
+        if background_tasks is not None:
+            background_tasks.add_task(execute_test_task_local, execution_id)
+            return "background_tasks"
+
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(execute_test_task_local(execution_id))
+            return "asyncio"
+        except RuntimeError:
+            asyncio.run(execute_test_task_local(execution_id))
+            return "inline"
 
 
 @celery_app.task(bind=True)

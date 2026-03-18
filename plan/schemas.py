@@ -83,6 +83,32 @@ class ExecutionRecordResponse(BaseModel):
         "from_attributes": True
     }
 
+
+class ExecutionResultResponse(BaseModel):
+    """执行结果详情响应模型"""
+    id: int
+    execution_id: int
+    case_id: Optional[int] = None
+    case_name: str
+    status: str
+    duration: Optional[int] = None
+    request: Optional[Dict[str, Any]] = None
+    response: Optional[Dict[str, Any]] = None
+    assertions: Optional[List[Dict[str, Any]]] = None
+    error_message: Optional[str] = None
+    stack_trace: Optional[str] = None
+    created_at: datetime
+
+    model_config = {
+        "from_attributes": True
+    }
+
+
+class ExecutionDetailResponse(ExecutionRecordResponse):
+    """执行记录详情响应模型"""
+    results: List[ExecutionResultResponse] = Field(default_factory=list)
+
+
 class ExecutionSummary(BaseModel):
     """执行摘要模型"""
     total: int

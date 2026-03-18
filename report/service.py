@@ -52,15 +52,18 @@ class ReportService(ReportServiceInterface):
     
     async def get_report(self, execution_id: int) -> Optional[Dict[str, Any]]:
         """获取报告"""
-        from plan.repository import ExecutionRecordRepository
+        from plan.repository import ExecutionRecordRepository, ExecutionResultRepository
         
         async with async_session_maker() as session:
             execution_repo = ExecutionRecordRepository(session)
+            execution_result_repo = ExecutionResultRepository(session)
             
             # 获取执行记录
             execution = await execution_repo.get_by_id(execution_id)
             if not execution:
                 return None
+
+            execution_results = await execution_result_repo.list_by_execution(execution_id)
             
             return {
                 "execution_id": execution_id,
@@ -70,7 +73,21 @@ class ReportService(ReportServiceInterface):
                 "end_time": execution.end_time.isoformat() if execution.end_time else None,
                 "duration": execution.duration,
                 "summary": execution.summary,
-                "report_url": execution.report_url
+                "report_url": execution.report_url,
+                "test_results": [
+                    {
+                        "case_id": result.case_id,
+                        "name": result.case_name,
+                        "status": result.status,
+                        "duration": result.duration,
+                        "request": result.request,
+                        "response": result.response,
+                        "assertions": result.assertions,
+                        "error_message": result.error_message,
+                        "stack_trace": result.stack_trace,
+                    }
+                    for result in execution_results
+                ]
             }
     
     async def generate_allure_html(self, allure_dir: str, output_dir: str) -> str:

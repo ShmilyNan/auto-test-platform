@@ -2,15 +2,16 @@
 测试计划相关API
 """
 from datetime import timezone
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from core.database import get_session
 from core.dependencies import get_current_user_id, check_project_permission
 from plan.service import PlanService
+from plan.repository import ExecutionRecordRepository
 from plan.schemas import (
     TestPlanCreate, TestPlanUpdate, TestPlanResponse,
-    ExecutionRecordResponse
+    ExecutionRecordResponse, ExecutionDetailResponse
 )
 
 router = APIRouter()
@@ -119,6 +120,7 @@ async def delete_plan(
 @router.post("/{plan_id}/run", response_model=ExecutionRecordResponse, status_code=status.HTTP_201_CREATED)
 async def run_plan(
     plan_id: int,
+    background_tasks: BackgroundTasks,
     current_user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session)
 ):
@@ -139,8 +141,8 @@ async def run_plan(
         execution = await plan_service.run_plan(plan_id, current_user_id)
 
         # 异步执行测试任务
-        from executor.tasks import execute_test_task
-        execute_test_task.delay(execution.id)
+        from executor.tasks import dispatch_test_execution
+        dispatch_test_execution(execution.id, background_tasks)
 
         return execution
     except ValueError as e:
@@ -150,7 +152,7 @@ async def run_plan(
         )
 
 
-@router.post("/{plan_id}/run-sync", response_model=ExecutionRecordResponse)
+@router.post("/{plan_id}/run-sync", response_model=ExecutionDetailResponse)
 async def run_plan_sync(
     plan_id: int,
     current_user_id: int = Depends(get_current_user_id),
@@ -213,7 +215,7 @@ async def list_executions(
     return executions
 
 
-@router.get("/executions/{execution_id}", response_model=ExecutionRecordResponse)
+@router.get("/executions/{execution_id}", response_model=ExecutionDetailResponse)
 async def get_execution(
     execution_id: int,
     session: AsyncSession = Depends(get_session),
@@ -242,8 +244,8 @@ async def cancel_execution(
     current_user_id: int = Depends(get_current_user_id)
 ):
     """取消执行"""
-    plan_service = PlanService(session)
-    execution = await plan_service.get_execution(execution_id)
+    execution_repo = ExecutionRecordRepository(session)
+    execution = await execution_repo.get_by_id(execution_id)
 
     if not execution:
         raise HTTPException(
@@ -267,7 +269,7 @@ async def cancel_execution(
     execution.end_time = datetime.now(timezone.utc)
     execution.error_message = "用户取消执行"
 
-    await session.commit()
+    await execution_repo.update(execution)
 
     # TODO: 如果有Celery任务正在运行，发送取消信号
     # from executor.tasks import execute_test_task
@@ -281,6 +283,7 @@ async def cancel_execution(
 @router.post("/executions/{execution_id}/rerun", response_model=ExecutionRecordResponse, status_code=status.HTTP_201_CREATED)
 async def rerun_execution(
     execution_id: int,
+    background_tasks: BackgroundTasks,
     current_user_id: int = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session)
 ):
@@ -300,8 +303,8 @@ async def rerun_execution(
     # 创建新的执行记录
     new_execution = await plan_service.run_plan(execution.plan_id, current_user_id)
 
-    # 异步执行测试任务
-    from executor.tasks import execute_test_task
-    execute_test_task.delay(new_execution.id)
+    # 优先投递到Celery；Broker不可用时回退到应用进程后台执行
+    from executor.tasks import dispatch_test_execution
+    dispatch_test_execution(new_execution.id, background_tasks)
 
     return new_execution

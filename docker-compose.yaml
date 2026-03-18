@@ -63,9 +63,9 @@ services:
       - DEBUG=false
     volumes:
       - ./logs:/app/logs
-      - ./storage:/tmp/storage
-      - test_results:/tmp/test_results
-      - allure_results:/tmp/allure_results
+      - ./storage:./output/storage
+      - allure_results_dir:./output/reports/allure
+      - allure_report_dir:./output/reports/allure-report
     ports:
       - "5000:5000"
     depends_on:
@@ -104,8 +104,8 @@ services:
       - DEBUG=false
     volumes:
       - ./logs:/app/logs
-      - test_results:/tmp/test_results
-      - allure_results:/tmp/allure_results
+      - test_results:./tmp/test_results
+      - allure_results:./tmp/allure_results
     depends_on:
       postgres:
         condition: service_healthy

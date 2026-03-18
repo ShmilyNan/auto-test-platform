@@ -3,7 +3,13 @@
 """
 from abc import ABC, abstractmethod
 from typing import Optional, List
-from plan.schemas import TestPlanCreate, TestPlanUpdate, TestPlanResponse, ExecutionRecordResponse
+from plan.schemas import (
+    TestPlanCreate,
+    TestPlanUpdate,
+    TestPlanResponse,
+    ExecutionRecordResponse,
+    ExecutionDetailResponse
+)
 
 
 class PlanServiceInterface(ABC):
@@ -40,7 +46,7 @@ class PlanServiceInterface(ABC):
         pass
     
     @abstractmethod
-    async def get_execution(self, execution_id: int) -> Optional[ExecutionRecordResponse]:
+    async def get_execution(self, execution_id: int) -> Optional[ExecutionDetailResponse]:
         """获取执行记录"""
         pass
     

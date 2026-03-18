@@ -1,15 +1,15 @@
 """
 测试执行引擎服务层
 """
-from typing import Dict, Any, List, Union
 import os
 import json
 import tempfile
 import shutil
-from datetime import datetime, timezone
-
 import httpx
-
+import textwrap
+from string import Template
+from typing import Dict, Any, List, Union
+from datetime import datetime, timezone
 from executor.assertions import AssertionEngine
 from executor.interfaces import ExecutorServiceInterface
 from core.logger import *
@@ -191,6 +191,10 @@ class ExecutorService(ExecutorServiceInterface):
                 # 运行pytest
                 pytest_result = await self.run_pytest(test_dir, allure_dir)
 
+                # 解析并持久化用例级执行结果
+                execution_results = await self.parse_test_case_results(allure_dir)
+                await self.save_execution_results(execution_id, execution_results)
+
                 # 解析allure结果
                 allure_result = await self.parse_allure_results(allure_dir)
 
@@ -285,98 +289,106 @@ class ExecutorService(ExecutorServiceInterface):
         """生成pytest测试文件"""
 
         # 生成conftest.py
-        conftest_content = '''
-        import pytest
-        import allure
-        import httpx
-        import json
-        
-        @pytest.fixture
-        def http_client():
-            """HTTP客户端fixture"""
-            with httpx.Client(timeout=30.0) as client:
-                yield client
-        '''
+        conftest_content = textwrap.dedent(
+            '''
+            import pytest
+            import allure
+            import httpx
+            import json
+
+            @pytest.fixture
+            def http_client():
+                """HTTP客户端fixture"""
+                with httpx.Client(timeout=30.0) as client:
+                    yield client
+            '''
+        )
 
         conftest_path = os.path.join(output_dir, "conftest.py")
         with open(conftest_path, "w", encoding="utf-8") as f:
             f.write(conftest_content)
 
         # 生成测试文件
-        test_content = '''
-        import pytest
-        import allure
-        import httpx
-        import json
-        
-        # 测试用例数据
-        TEST_CASES = {test_cases_data}
-        
-        @pytest.mark.parametrize("case", TEST_CASES, ids=[c["name"] for c in TEST_CASES])
-        def test_api_case(case, http_client):
-            """API测试用例"""
-            with allure.step(f"执行测试: {case['name']}"):
-                # 发送请求
-                response = http_client.request(
-                    method=case["method"],
-                    url=case["url"],
-                    headers=case.get("headers", {{}}),
-                    params=case.get("params", {{}}),
-                    json=case.get("body"),
-                    timeout=case.get("timeout", 30)
-                )
-                
-                # 添加Allure附件
-                allure.attach(
-                    json.dumps(case, ensure_ascii=False, indent=2),
-                    name="请求信息",
-                    attachment_type=allure.attachment_type.JSON
-                )
-                
-                allure.attach(
-                    response.text,
-                    name="响应内容",
-                    attachment_type=allure.attachment_type.TEXT
-                )
-                
-                # 执行断言
-                assertions = case.get("assertions", [])
-                for assertion in assertions:
-                    assertion_type = assertion.get("type")
-                    expected = assertion.get("expected")
-                    
-                    if assertion_type == "status_code":
-                        assert response.status_code == expected, f"状态码断言失败: 期望 {{expected}}, 实际 {{response.status_code}}"
-                    elif assertion_type == "response_time":
-                        assert response.elapsed.total_seconds() < expected, f"响应时间断言失败: 期望 < {{expected}}s"
-                    elif assertion_type == "json_path":
-                        # JSON路径断言
-                        json_path = assertion.get("path")
-                        actual_value = assertion.get("actual")
-                        
-                        # 使用jsonpath解析响应
-                        try:
-                            import jsonpath
-                            json_data = response.json()
-                            values = jsonpath.jsonpath(json_data, json_path)
-                            
-                            if values:
-                                actual = values[0]
-                                assert actual == expected, f"JSON路径断言失败: 路径 {{json_path}}, 期望 {{expected}}, 实际 {{actual}}"
-                            else:
-                                raise AssertionError(f"JSON路径断言失败: 路径 {{json_path}} 未找到匹配值")
-                        except ImportError:
-                            # 简化实现：直接访问嵌套字典
-                            keys = json_path.replace("$.", "").split(".")
-                            actual = response.json()
-                            for key in keys:
-                                if isinstance(actual, dict):
-                                    actual = actual.get(key)
-                                else:
-                                    raise AssertionError(f"JSON路径断言失败: 无法访问路径 {{json_path}}")
-                            
-                            assert actual == expected, f"JSON路径断言失败: 路径 {{json_path}}, 期望 {{expected}}, 实际 {{actual}}"
-'''.format(test_cases_data=json.dumps(test_cases, ensure_ascii=False, indent=4))
+        test_template = Template(
+            textwrap.dedent(
+                '''
+                import pytest
+                import allure
+                import httpx
+                import json
+
+                # 测试用例数据
+                TEST_CASES = $test_cases_data
+
+                @pytest.mark.parametrize("case", TEST_CASES, ids=[c["name"] for c in TEST_CASES])
+                def test_api_case(case, http_client):
+                    """API测试用例"""
+                    with allure.step(f"执行测试: {case['name']}"):
+                        # 发送请求
+                        response = http_client.request(
+                            method=case["method"],
+                            url=case["url"],
+                            headers=case.get("headers", {}),
+                            params=case.get("params", {}),
+                            json=case.get("body"),
+                            timeout=case.get("timeout", 30)
+                        )
+
+                        # 添加Allure附件
+                        allure.attach(
+                            json.dumps(case, ensure_ascii=False, indent=2),
+                            name="请求信息",
+                            attachment_type=allure.attachment_type.JSON
+                        )
+
+                        allure.attach(
+                            response.text,
+                            name="响应内容",
+                            attachment_type=allure.attachment_type.TEXT
+                        )
+
+                        # 执行断言
+                        assertions = case.get("assertions", [])
+                        for assertion in assertions:
+                            assertion_type = assertion.get("type")
+                            expected = assertion.get("expected")
+
+                            if assertion_type == "status_code":
+                                assert response.status_code == expected, f"状态码断言失败: 期望 {expected}, 实际 {response.status_code}"
+                            elif assertion_type == "response_time":
+                                assert response.elapsed.total_seconds() < expected, f"响应时间断言失败: 期望 < {expected}s"
+                            elif assertion_type == "json_path":
+                                # JSON路径断言
+                                json_path = assertion.get("path")
+
+                                # 使用jsonpath解析响应
+                                try:
+                                    import jsonpath
+                                    json_data = response.json()
+                                    values = jsonpath.jsonpath(json_data, json_path)
+
+                                    if values:
+                                        actual = values[0]
+                                        assert actual == expected, f"JSON路径断言失败: 路径 {json_path}, 期望 {expected}, 实际 {actual}"
+                                    else:
+                                        raise AssertionError(f"JSON路径断言失败: 路径 {json_path} 未找到匹配值")
+                                except ImportError:
+                                    # 简化实现：直接访问嵌套字典
+                                    keys = json_path.replace("$$.", "").split(".")
+                                    actual = response.json()
+                                    for key in keys:
+                                        if isinstance(actual, dict):
+                                            actual = actual.get(key)
+                                        else:
+                                            raise AssertionError(f"JSON路径断言失败: 无法访问路径 {json_path}")
+
+                                    assert actual == expected, f"JSON路径断言失败: 路径 {json_path}, 期望 {expected}, 实际 {actual}"
+                '''
+            )
+        )
+        test_content = test_template.substitute(
+            test_cases_data=json.dumps(test_cases, ensure_ascii=False, indent=4)
+        )
         
         test_path = os.path.join(output_dir, "test_api.py")
         with open(test_path, "w", encoding="utf-8") as f:
@@ -442,3 +454,94 @@ class ExecutorService(ExecutorServiceInterface):
             "skipped": skipped,
             "pass_rate": round(passed / total * 100, 2) if total > 0 else 0
         }
+
+    async def parse_test_case_results(self, allure_dir: str) -> List[Dict[str, Any]]:
+        """解析Allure结果中的用例级请求/响应详情"""
+        import glob
+
+        execution_results: List[Dict[str, Any]] = []
+        result_files = glob.glob(os.path.join(allure_dir, "*-result.json"))
+
+        for result_file in result_files:
+            with open(result_file, "r", encoding="utf-8") as f:
+                result_data = json.load(f)
+
+            attachments = {
+                attachment.get("name"): attachment
+                for attachment in result_data.get("attachments", [])
+                if attachment.get("name")
+            }
+
+            request_payload = self._load_allure_attachment(allure_dir, attachments.get("请求信息"))
+            response_payload = self._load_allure_attachment(allure_dir, attachments.get("响应信息"))
+            status_details = result_data.get("statusDetails") or {}
+            start_time = result_data.get("start")
+            stop_time = result_data.get("stop")
+
+            execution_results.append(
+                {
+                    "case_id": request_payload.get("id") if isinstance(request_payload, dict) else None,
+                    "case_name": result_data.get("name", "Unknown"),
+                    "status": result_data.get("status", "unknown"),
+                    "duration": int(stop_time - start_time) if start_time and stop_time else None,
+                    "request": request_payload if isinstance(request_payload, dict) else None,
+                    "response": response_payload if isinstance(response_payload, dict) else None,
+                    "assertions": request_payload.get("assertions") if isinstance(request_payload, dict) else None,
+                    "error_message": status_details.get("message"),
+                    "stack_trace": status_details.get("trace"),
+                }
+            )
+
+        return execution_results
+
+    def _load_allure_attachment(self, allure_dir: str, attachment: Dict[str, Any] | None) -> Any:
+        """读取Allure附件内容"""
+        if not attachment:
+            return None
+
+        source = attachment.get("source")
+        if not source:
+            return None
+
+        attachment_path = os.path.join(allure_dir, source)
+        if not os.path.exists(attachment_path):
+            return None
+
+        with open(attachment_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        attachment_type = attachment.get("type", "")
+        if "json" in attachment_type.lower():
+            try:
+                return json.loads(content)
+            except json.JSONDecodeError:
+                return {"raw": content}
+
+        return {"raw": content}
+
+    async def save_execution_results(self, execution_id: int, execution_results: List[Dict[str, Any]]) -> None:
+        """持久化用例级执行结果"""
+        from plan.models import ExecutionResult
+        from plan.repository import ExecutionResultRepository
+
+        if not execution_results:
+            return
+
+        async with async_session_maker() as session:
+            result_repo = ExecutionResultRepository(session)
+            records = [
+                ExecutionResult(
+                    execution_id=execution_id,
+                    case_id=result.get("case_id"),
+                    case_name=result.get("case_name", "Unknown"),
+                    status=result.get("status", "unknown"),
+                    duration=result.get("duration"),
+                    request=result.get("request"),
+                    response=result.get("response"),
+                    assertions=result.get("assertions"),
+                    error_message=result.get("error_message"),
+                    stack_trace=result.get("stack_trace"),
+                )
+                for result in execution_results
+            ]
+            await result_repo.create_batch(records)

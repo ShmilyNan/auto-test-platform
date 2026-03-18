@@ -42,8 +42,8 @@ jwt:
 
 # 测试执行配置
 test_execution:
-  results_dir: "/tmp/test_results"
-  allure_results_dir: "/tmp/allure_results"
+  allure_results_dir: "./output/reports/allure"
+  allure_report_dir: "./output/reports/allure_report"
   max_concurrent_executions: 5
   default_timeout: 30
   max_timeout: 600
@@ -51,7 +51,7 @@ test_execution:
 # 存储配置
 storage:
   type: "local"  # local, oss, s3
-  path: "/tmp/storage"
+  path: "./output/storage"
   # OSS配置（如果使用）
   oss:
     endpoint: ""

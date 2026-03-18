@@ -4,7 +4,7 @@
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from plan.models import TestPlan, ExecutionRecord
+from plan.models import TestPlan, ExecutionRecord, ExecutionResult
 
 
 class TestPlanRepository:
@@ -84,5 +84,36 @@ class ExecutionRecordRepository:
             .order_by(ExecutionRecord.created_at.desc())
             .offset(skip)
             .limit(limit)
+        )
+        return result.scalars().all()
+
+
+class ExecutionResultRepository:
+    """执行结果详情仓库"""
+
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def create(self, result: ExecutionResult) -> ExecutionResult:
+        """创建单条执行结果"""
+        self.session.add(result)
+        await self.session.commit()
+        await self.session.refresh(result)
+        return result
+
+    async def create_batch(self, results: List[ExecutionResult]) -> List[ExecutionResult]:
+        """批量创建执行结果"""
+        self.session.add_all(results)
+        await self.session.commit()
+        for result in results:
+            await self.session.refresh(result)
+        return results
+
+    async def list_by_execution(self, execution_id: int) -> List[ExecutionResult]:
+        """根据执行记录获取测试结果详情"""
+        result = await self.session.execute(
+            select(ExecutionResult)
+            .where(ExecutionResult.execution_id == execution_id)
+            .order_by(ExecutionResult.id.asc())
         )
         return result.scalars().all()

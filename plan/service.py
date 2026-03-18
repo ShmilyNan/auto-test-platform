@@ -1,21 +1,19 @@
 """
 测试计划服务层
 """
+import uuid
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
-import uuid
-
 from plan.interfaces import PlanServiceInterface
 from plan.models import TestPlan, ExecutionRecord
 from plan.schemas import (
     TestPlanCreate, TestPlanUpdate, TestPlanResponse,
-    ExecutionRecordResponse
+    ExecutionRecordResponse, ExecutionDetailResponse,
+    ExecutionResultResponse
 )
-from plan.repository import TestPlanRepository, ExecutionRecordRepository
-from core.logger import get_logger
+from plan.repository import TestPlanRepository, ExecutionRecordRepository, ExecutionResultRepository
+from core.logger import logger
 from core.config import settings
-
-logger = get_logger(__name__)
 
 
 class PlanService(PlanServiceInterface):
@@ -24,6 +22,7 @@ class PlanService(PlanServiceInterface):
     def __init__(self, session: AsyncSession):
         self.plan_repo = TestPlanRepository(session)
         self.execution_repo = ExecutionRecordRepository(session)
+        self.execution_result_repo = ExecutionResultRepository(session)
     
     async def create_plan(self, plan_data: TestPlanCreate, user_id: int) -> TestPlanResponse:
         """创建测试计划"""
@@ -109,11 +108,15 @@ class PlanService(PlanServiceInterface):
         
         return ExecutionRecordResponse.model_validate(created_execution)
     
-    async def get_execution(self, execution_id: int) -> Optional[ExecutionRecordResponse]:
+    async def get_execution(self, execution_id: int) -> Optional[ExecutionDetailResponse]:
         """获取执行记录"""
         execution = await self.execution_repo.get_by_id(execution_id)
         if execution:
-            return ExecutionRecordResponse.model_validate(execution)
+            results = await self.execution_result_repo.list_by_execution(execution_id)
+            return ExecutionDetailResponse(
+                **ExecutionRecordResponse.model_validate(execution).model_dump(),
+                results=[ExecutionResultResponse.model_validate(result) for result in results]
+            )
         return None
     
     async def list_executions(self, plan_id: int, skip: int = 0, limit: int = 100) -> List[ExecutionRecordResponse]:
