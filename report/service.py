@@ -5,13 +5,10 @@ from typing import Dict, Any, Optional
 import os
 import subprocess
 import shutil
-
 from report.interfaces import ReportServiceInterface
-from core.logger import get_logger
+from core.logger import logger
 from core.config import settings
 from core.database import async_session_maker
-
-logger = get_logger(__name__)
 
 
 class ReportService(ReportServiceInterface):

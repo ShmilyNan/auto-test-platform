@@ -4,7 +4,7 @@ app:
   version: "1.0.0"
   description: "模块化单体架构的自动化测试平台"
   debug: false
-  environment: "dev"  # dev, prod
+  environment: "development"  # development, staging, production
 
 # API配置
 api:
@@ -42,8 +42,9 @@ jwt:
 
 # 测试执行配置
 test_execution:
-  allure_results_dir: "./output/reports/allure"
-  allure_report_dir: "./output/reports/allure_report"
+  # 结果目录由 core/constants.py 统一管理
+  # ALLURE_RESULTS_DIR: output/reports/allure
+  # ALLURE_REPORT_DIR: output/reports/allure-report
   max_concurrent_executions: 5
   default_timeout: 30
   max_timeout: 600
@@ -51,7 +52,8 @@ test_execution:
 # 存储配置
 storage:
   type: "local"  # local, oss, s3
-  path: "./output/storage"
+  # 存储路径由 core/constants.py 统一管理
+  # STORAGE_PATH: output/storage
   # OSS配置（如果使用）
   oss:
     endpoint: ""

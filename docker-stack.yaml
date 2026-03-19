@@ -1,0 +1,444 @@
+version: '3.8'
+
+# Docker Swarm 部署配置 - 使用 Secrets 管理敏感信息
+# 使用方式:
+#   1. 创建 secrets: ./deploy.sh secrets-create
+#   2. 部署服务: docker stack deploy -c docker-stack.yml autotest
+
+secrets:
+  # ============================================
+  # 核心敏感信息
+  # ============================================
+  postgres_password:
+    external: true
+    name: autotest_postgres_password
+
+  secret_key:
+    external: true
+    name: autotest_secret_key
+
+  # ============================================
+  # 通知服务密钥（可选）
+  # ============================================
+  smtp_password:
+    external: true
+    name: autotest_smtp_password
+
+  dingtalk_webhook:
+    external: true
+    name: autotest_dingtalk_webhook
+
+  wechat_webhook:
+    external: true
+    name: autotest_wechat_webhook
+
+  # ============================================
+  # 对象存储密钥（可选）
+  # ============================================
+  oss_access_key:
+    external: true
+    name: autotest_oss_access_key
+
+  oss_secret_key:
+    external: true
+    name: autotest_oss_secret_key
+
+services:
+  # ============================================
+  # 数据库服务
+  # ============================================
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: autotest_user
+      # 从 secret 文件读取密码
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_DB: autotest_platform
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    secrets:
+      - postgres_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - autotest-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U autotest_user -d autotest_platform"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 3
+        window: 120s
+
+  # ============================================
+  # Redis服务
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --maxmemory 1gb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - autotest-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 3
+        window: 120s
+
+  # ============================================
+  # API服务
+  # ============================================
+  api:
+    image: ${DOCKER_REGISTRY:-registry.example.com}/autotest-platform:${IMAGE_TAG:-latest}
+    environment:
+      # 使用 secrets 文件路径
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
+      - SECRET_KEY_FILE=/run/secrets/secret_key
+      # 非敏感配置
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_USER=autotest_user
+      - DATABASE_NAME=autotest_platform
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB_CACHE=0
+      - REDIS_DB_CELERY_BROKER=1
+      - REDIS_DB_CELERY_BACKEND=2
+      # 应用配置
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - APP_NAME=${APP_NAME:-自动化测试平台}
+      - APP_VERSION=${APP_VERSION:-1.0.0}
+      # 可选 secrets（通知服务）
+      - SMTP_PASSWORD_FILE=/run/secrets/smtp_password
+      - DINGTALK_WEBHOOK_FILE=/run/secrets/dingtalk_webhook
+      - WECHAT_WEBHOOK_FILE=/run/secrets/wechat_webhook
+      # 可选 secrets（对象存储）
+      - OSS_ACCESS_KEY_FILE=/run/secrets/oss_access_key
+      - OSS_SECRET_KEY_FILE=/run/secrets/oss_secret_key
+    secrets:
+      - postgres_password
+      - secret_key
+      - smtp_password
+      - dingtalk_webhook
+      - wechat_webhook
+      - oss_access_key
+      - oss_secret_key
+    volumes:
+      - logs:/app/logs
+      - storage:/app/output/storage
+      - allure_results:/app/output/reports/allure
+      - allure_report:/app/output/reports/allure-report
+    networks:
+      - autotest-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:5000/health', timeout=5.0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    depends_on:
+      - postgres
+      - redis
+    deploy:
+      mode: replicated
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        delay: 10s
+      placement:
+        constraints: []
+        preferences:
+          - spread: node.id
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 3
+        window: 120s
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.api.rule=Host(`api.example.com`)"
+        - "traefik.http.services.api.loadbalancer.server.port=5000"
+
+  # ============================================
+  # Celery Worker服务（测试执行器）
+  # ============================================
+  celery-worker:
+    image: ${DOCKER_REGISTRY:-registry.example.com}/autotest-platform:${IMAGE_TAG:-latest}
+    command: celery -A scheduler worker --loglevel=info --concurrency=4 --max-tasks-per-child=100
+    environment:
+      # 使用 secrets 文件路径
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
+      - SECRET_KEY_FILE=/run/secrets/secret_key
+      # 非敏感配置
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_USER=autotest_user
+      - DATABASE_NAME=autotest_platform
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB_CACHE=0
+      - REDIS_DB_CELERY_BROKER=1
+      - REDIS_DB_CELERY_BACKEND=2
+      # 应用配置
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - CELERY_WORKER_CONCURRENCY=4
+      - CELERY_WORKER_PREFETCH_MULTIPLIER=1
+    secrets:
+      - postgres_password
+      - secret_key
+    volumes:
+      - logs:/app/logs
+      - allure_results:/app/output/reports/allure
+      - allure_report:/app/output/reports/allure-report
+    networks:
+      - autotest-network
+    depends_on:
+      - postgres
+      - redis
+    deploy:
+      mode: replicated
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 30s
+        failure_action: rollback
+      placement:
+        constraints: []
+        preferences:
+          - spread: node.id
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 1G
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 3
+        window: 120s
+
+  # ============================================
+  # Celery Beat服务（定时任务调度器）
+  # ============================================
+  celery-beat:
+    image: ${DOCKER_REGISTRY:-registry.example.com}/autotest-platform:${IMAGE_TAG:-latest}
+    command: celery -A scheduler beat --loglevel=info
+    environment:
+      # 使用 secrets 文件路径
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
+      - SECRET_KEY_FILE=/run/secrets/secret_key
+      # 非敏感配置
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_USER=autotest_user
+      - DATABASE_NAME=autotest_platform
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB_CACHE=0
+      - REDIS_DB_CELERY_BROKER=1
+      - REDIS_DB_CELERY_BACKEND=2
+      # 应用配置
+      - ENVIRONMENT=production
+      - DEBUG=false
+    secrets:
+      - postgres_password
+      - secret_key
+    volumes:
+      - logs:/app/logs
+    networks:
+      - autotest-network
+    depends_on:
+      - postgres
+      - redis
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 3
+        window: 120s
+
+  # ============================================
+  # Nginx反向代理
+  # ============================================
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    networks:
+      - autotest-network
+    depends_on:
+      - api
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 3
+        window: 120s
+
+  # ============================================
+  # Visualizer（可选 - Swarm集群可视化）
+  # ============================================
+  visualizer:
+    image: dockersamples/visualizer:stable
+    ports:
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - autotest-network
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    profiles:
+      - visualizer
+
+# ============================================
+# 网络配置（Overlay网络，跨节点通信）
+# ============================================
+networks:
+  autotest-network:
+    driver: overlay
+    attachable: true
+    driver_opts:
+      encrypted: true
+    labels:
+      - "autotest.network=overlay"
+
+# ============================================
+# 数据卷配置
+# ============================================
+volumes:
+  postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /data/autotest/postgres
+  redis_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /data/autotest/redis
+  logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /data/autotest/logs
+  storage:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /data/autotest/storage
+  allure_results:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /data/autotest/allure-results
+  allure_report:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /data/autotest/allure-repor
+  nginx_logs:
+    driver: local

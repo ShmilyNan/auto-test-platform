@@ -2,7 +2,7 @@
 用户相关的Pydantic模型
 """
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime
 
 

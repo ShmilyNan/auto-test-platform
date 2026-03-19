@@ -6,7 +6,6 @@ from typing import Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from core.constants import ProjectRole, UserRole
 from core.database import get_session
 from core.security import decode_access_token

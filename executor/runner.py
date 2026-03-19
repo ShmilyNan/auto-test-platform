@@ -8,10 +8,8 @@ import os
 from typing import List, Dict, Any
 from datetime import datetime
 from executor.service import ExecutorService
-from core.logger import get_logger, setup_logging
+from core.logger import logger, setup_logging
 from core.config import settings
-
-logger = get_logger(__name__)
 
 
 class TestRunner:

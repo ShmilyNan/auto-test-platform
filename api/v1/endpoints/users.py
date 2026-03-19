@@ -3,7 +3,6 @@
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Union
 from core.database import get_session
 from core.dependencies import get_current_user, get_current_admin_user, get_current_user_id
 from user.service import UserService

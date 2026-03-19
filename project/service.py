@@ -3,7 +3,6 @@
 """
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from project.interfaces import ProjectServiceInterface
 from project.models import Project, ProjectMember
 from project.schemas import (
@@ -11,9 +10,8 @@ from project.schemas import (
     ProjectMemberCreate, ProjectMemberResponse
 )
 from project.repository import ProjectRepository, ProjectMemberRepository
-from core.logger import get_logger
+from core.logger import logger
 
-logger = get_logger(__name__)
 
 
 class ProjectService(ProjectServiceInterface):

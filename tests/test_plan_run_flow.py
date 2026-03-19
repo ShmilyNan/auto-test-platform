@@ -1,7 +1,6 @@
 import sys
 from datetime import datetime, timezone
 from types import SimpleNamespace
-
 from core.constants import ALLURE_RESULTS_DIR
 
 sys.modules.setdefault("toml", SimpleNamespace(load=lambda *args, **kwargs: {}))
@@ -13,8 +12,6 @@ import executor.tasks as executor_tasks
 import scheduler.tasks as scheduler_tasks
 from executor.service import ExecutorService
 from plan.service import PlanService
-
-
 
 
 @pytest.mark.asyncio

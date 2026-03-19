@@ -3,7 +3,6 @@
 """
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from testcase.interfaces import TestCaseServiceInterface
 from testcase.models import TestCase, TestSuite
 from testcase.schemas import (
@@ -11,9 +10,7 @@ from testcase.schemas import (
     TestSuiteCreate, TestSuiteUpdate, TestSuiteResponse
 )
 from testcase.repository import TestCaseRepository, TestSuiteRepository
-from core.logger import get_logger
-
-logger = get_logger(__name__)
+from core.logger import logger
 
 
 class TestCaseService(TestCaseServiceInterface):

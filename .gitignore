@@ -13,6 +13,15 @@ __pycache__/
 /.env
 .env
 
+# Docker Secrets (敏感信息，禁止提交)
+secrets/*.txt
+!secrets/.template/
+!secrets/README.md
+
+# 输出目录（测试结果、报告等）
+output/
+!output/.gitkeep
+
 # JS/TS bundlers & build outputs
 .next
 .nuxt

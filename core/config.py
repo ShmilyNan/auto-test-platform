@@ -1,15 +1,17 @@
 """
 配置管理模块
-支持从 config.yaml、pyproject.toml 和 .env 文件加载配置
-配置优先级: 环境变量 > .env > config.yaml > 默认值
+支持从 config.yaml和 Docker Secrets 加载配置
+配置优先级: Docker Secrets > 环境变量 > .env > config.yaml > 默认值
+注意: pyproject.toml 仅用于开发工具配置（black, isort, mypy, pytest等）
+      项目元数据和业务配置统一在 config.yaml 中管理
 """
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from functools import lru_cache
 from ruamel.yaml import YAML
-import toml
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from .constants import *
+from loguru import logger
 
 _yaml = YAML(typ="safe")
 _yaml.default_flow_style = False
@@ -18,21 +20,35 @@ _yaml.preserve_quotes = True
 _yaml.sort_keys = False
 
 
+def read_secret(secret_name: str) -> Optional[str]:
+    """
+    从 Docker Secrets 文件读取敏感信息
+    Docker Swarm 将 secrets 挂载到 /run/secrets/<secret_name>
+    Args:
+        secret_name: secret 名称
+    Returns:
+        secret 内容，如果不存在返回 None
+    """
+    # Docker secrets 默认路径
+    secret_path = Path(f"/run/secrets/{secret_name}")
+
+    if secret_path.exists():
+        try:
+            content = secret_path.read_text().strip()
+            logger.debug(f"成功从 Docker Secret 读取: {secret_name}")
+            return content
+        except Exception as e:
+            logger.warning(f"读取 Docker Secret 失败 [{secret_name}]: {e}")
+
+    return None
+
+
 def load_yaml_config() -> Dict[str, Any]:
     """加载YAML配置文件"""
     config_path = Path("config.yaml")
     if config_path.exists():
         with open(config_path, "r", encoding="utf-8") as f:
             return _yaml.load(f) or {}
-    return {}
-
-
-def load_toml_config() -> Dict[str, Any]:
-    """加载TOML配置文件"""
-    config_path = Path("pyproject.toml")
-    if config_path.exists():
-        with open(config_path, "r", encoding="utf-8") as f:
-            return toml.load(f) or {}
     return {}
 
 
@@ -47,36 +63,125 @@ class Settings(BaseSettings):
     )
 
     # ============================================
-    # 敏感配置（从环境变量读取）
+    # 敏感配置（优先从 Docker Secrets 读取）
     # ============================================
 
-    # 数据库
+    # 数据库密码
+    _postgres_password: Optional[str] = None
+    POSTGRES_PASSWORD: str = Field(
+        default="",
+        description="PostgreSQL 密码（从 Secret 或环境变量读取）"
+    )
+
+    # 数据库连接信息
+    DATABASE_HOST: str = Field(
+        default="localhost",
+        description="数据库主机"
+    )
+    DATABASE_PORT: int = Field(
+        default=5432,
+        description="数据库端口"
+    )
+    DATABASE_USER: str = Field(
+        default="autotest_user",
+        description="数据库用户"
+    )
+    DATABASE_NAME: str = Field(
+        default="autotest_platform",
+        description="数据库名称"
+    )
+
+    # 完整数据库URL（由其他字段构建）
     DATABASE_URL: str = Field(
-        default="postgresql+asyncpg://autotest_user:776462@localhost:5432/autotest_platform",
+        default="",
         description="数据库连接URL"
     )
 
-    # Redis
+    # Redis连接信息
+    REDIS_HOST: str = Field(
+        default="localhost",
+        description="Redis主机"
+    )
+    REDIS_PORT: int = Field(
+        default=6379,
+        description="Redis端口"
+    )
+    REDIS_DB_CACHE: int = Field(
+        default=0,
+        description="Redis缓存数据库"
+    )
+    REDIS_DB_CELERY_BROKER: int = Field(
+        default=1,
+        description="Celery Broker 数据库"
+    )
+    REDIS_DB_CELERY_BACKEND: int = Field(
+        default=2,
+        description="Celery Backend 数据库"
+    )
+
+    # Redis URL（由其他字段构建）
     REDIS_URL: str = Field(
-        default="redis://localhost:6379/0",
+        default="",
         description="Redis连接URL"
     )
     CELERY_BROKER_URL: str = Field(
-        default="redis://localhost:6379/1",
+        default="",
         description="Celery Broker URL"
     )
     CELERY_RESULT_BACKEND: str = Field(
-        default="redis://localhost:6379/2",
+        default="",
         description="Celery结果后端URL"
     )
 
-    # JWT
+    # JWT密钥
+    _secret_key: Optional[str] = None
     SECRET_KEY: str = Field(
-        default="your-super-secret-key-change-in-production",
-        description="JWT密钥"
+        default="",
+        description="JWT密钥（从 Secret 或环境变量读取）"
     )
 
-    # 环境
+    # ============================================
+    # 通知服务密钥（可选）
+    # ============================================
+
+    _smtp_password: Optional[str] = None
+    SMTP_PASSWORD: str = Field(
+        default="",
+        description="SMTP密码"
+    )
+
+    _dingtalk_webhook: Optional[str] = None
+    DINGTALK_WEBHOOK: str = Field(
+        default="",
+        description="钉钉机器人Webhook"
+    )
+
+    _wechat_webhook: Optional[str] = None
+    WECHAT_WEBHOOK: str = Field(
+        default="",
+        description="企业微信机器人Webhook"
+    )
+
+    # ============================================
+    # 对象存储密钥（可选）
+    # ============================================
+
+    _oss_access_key: Optional[str] = None
+    OSS_ACCESS_KEY: str = Field(
+        default="",
+        description="OSS访问密钥"
+    )
+
+    _oss_secret_key: Optional[str] = None
+    OSS_SECRET_KEY: str = Field(
+        default="",
+        description="OSS密钥"
+    )
+
+    # ============================================
+    # 应用配置（从YAML读取）
+    # ============================================
+
     ENVIRONMENT: str = Field(
         default=Environment.DEVELOPMENT.value,
         description="运行环境"
@@ -85,11 +190,6 @@ class Settings(BaseSettings):
         default=True,
         description="调试模式"
     )
-
-    # ============================================
-    # 应用配置（从YAML读取）
-    # ============================================
-
     APP_NAME: str = "自动化测试平台"
     APP_VERSION: str = "1.0.0"
     APP_DESCRIPTION: str = "模块化单体架构的自动化测试平台"
@@ -105,11 +205,6 @@ class Settings(BaseSettings):
     DB_POOL_PRE_PING: bool = True
     DB_ECHO: bool = False
 
-    # Redis配置
-    REDIS_DB_CACHE: int = 0
-    REDIS_DB_CELERY_BROKER: int = 1
-    REDIS_DB_CELERY_BACKEND: int = 2
-
     # Celery配置
     CELERY_WORKER_CONCURRENCY: int = 4
     CELERY_WORKER_PREFETCH_MULTIPLIER: int = 1
@@ -123,15 +218,15 @@ class Settings(BaseSettings):
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # 测试执行配置
-    ALLURE_RESULTS_DIR: str = str(ALLURE_RESULTS_DIR)
-    ALLURE_REPORT_DIR: str = str(ALLURE_REPORT_DIR)
+    ALLURE_RESULTS_DIR: str = ALLURE_RESULTS_DIR
+    ALLURE_REPORT_DIR: str = ALLURE_REPORT_DIR
     MAX_CONCURRENT_EXECUTIONS: int = 5
     DEFAULT_TIMEOUT: int = DEFAULT_TIMEOUT
     MAX_TIMEOUT: int = MAX_TIMEOUT
 
     # 存储配置
     STORAGE_TYPE: str = StorageType.LOCAL.value
-    STORAGE_PATH: str = str(STORAGE_PATH)
+    STORAGE_PATH: str = STORAGE_PATH
 
     # 日志配置
     LOG_LEVEL: str = "INFO"
@@ -158,7 +253,68 @@ class Settings(BaseSettings):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self._load_secrets()
         self._load_yaml_config()
+        self._build_connection_urls()
+
+    def _load_secrets(self):
+        """
+        从 Docker Secrets 加载敏感信息
+        优先级: Docker Secrets > 环境变量 > 默认值
+        """
+        # PostgreSQL 密码
+        self._postgres_password = read_secret("postgres_password")
+        if self._postgres_password:
+            self.POSTGRES_PASSWORD = self._postgres_password
+
+        # JWT 密钥
+        self._secret_key = read_secret("secret_key")
+        if self._secret_key:
+            self.SECRET_KEY = self._secret_key
+
+        # SMTP 密码
+        self._smtp_password = read_secret("smtp_password")
+        if self._smtp_password:
+            self.SMTP_PASSWORD = self._smtp_password
+
+        # 钉钉 Webhook
+        self._dingtalk_webhook = read_secret("dingtalk_webhook")
+        if self._dingtalk_webhook:
+            self.DINGTALK_WEBHOOK = self._dingtalk_webhook
+
+        # 微信 Webhook
+        self._wechat_webhook = read_secret("wechat_webhook")
+        if self._wechat_webhook:
+            self.WECHAT_WEBHOOK = self._wechat_webhook
+
+        # OSS 密钥
+        self._oss_access_key = read_secret("oss_access_key")
+        if self._oss_access_key:
+            self.OSS_ACCESS_KEY = self._oss_access_key
+
+        self._oss_secret_key = read_secret("oss_secret_key")
+        if self._oss_secret_key:
+            self.OSS_SECRET_KEY = self._oss_secret_key
+
+    def _build_connection_urls(self):
+        """构建数据库和 Redis 连接 URL"""
+        # 构建数据库 URL
+        if not self.DATABASE_URL:
+            password = self.POSTGRES_PASSWORD or "776462"
+            self.DATABASE_URL = (
+                f"postgresql+asyncpg://{self.DATABASE_USER}:{password}"
+                f"@{self.DATABASE_HOST}:{self.DATABASE_PORT}/{self.DATABASE_NAME}"
+            )
+
+        # 构建 Redis URL
+        if not self.REDIS_URL:
+            self.REDIS_URL = f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB_CACHE}"
+
+        if not self.CELERY_BROKER_URL:
+            self.CELERY_BROKER_URL = f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB_CELERY_BROKER}"
+
+        if not self.CELERY_RESULT_BACKEND:
+            self.CELERY_RESULT_BACKEND = f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB_CELERY_BACKEND}"
 
     def _load_yaml_config(self):
         """从YAML文件加载配置"""
@@ -207,8 +363,8 @@ class Settings(BaseSettings):
 
         # 测试执行配置
         test_config = yaml_config.get("test_execution", {})
-        self.ALLURE_RESULTS_DIR = test_config.get("allure_results_dir", self.ALLURE_RESULTS_DIR)
-        self.ALLURE_REPORT_DIR = test_config.get("allure_report_dir", self.ALLURE_REPORT_DIR)
+        # self.ALLURE_RESULTS_DIR = test_config.get("allure_results_dir", self.ALLURE_RESULTS_DIR)
+        # self.ALLURE_REPORT_DIR = test_config.get("allure_report_dir", self.ALLURE_REPORT_DIR)
         self.MAX_CONCURRENT_EXECUTIONS = test_config.get("max_concurrent_executions", self.MAX_CONCURRENT_EXECUTIONS)
         self.DEFAULT_TIMEOUT = test_config.get("default_timeout", self.DEFAULT_TIMEOUT)
         self.MAX_TIMEOUT = test_config.get("max_timeout", self.MAX_TIMEOUT)
@@ -216,7 +372,7 @@ class Settings(BaseSettings):
         # 存储配置
         storage_config = yaml_config.get("storage", {})
         self.STORAGE_TYPE = storage_config.get("type", self.STORAGE_TYPE)
-        self.STORAGE_PATH = storage_config.get("path", self.STORAGE_PATH)
+        # self.STORAGE_PATH = storage_config.get("path", self.STORAGE_PATH)
 
         # 日志配置
         log_config = yaml_config.get("logging", {})
@@ -259,6 +415,27 @@ class Settings(BaseSettings):
     def is_staging(self) -> bool:
         """是否预发布环境"""
         return self.ENVIRONMENT == Environment.STAGING.value
+
+    def get_secret_source(self, secret_name: str) -> str:
+        """
+        获取 secret 的来源
+
+        Args:
+            secret_name: secret 名称
+
+        Returns:
+            来源描述: "docker_secret", "environment", "default"
+        """
+        secret_path = Path(f"/run/secrets/{secret_name}")
+        if secret_path.exists():
+            return "docker_secret"
+
+        # 检查环境变量
+        env_var = secret_name.upper()
+        if env_var in self.model_dump():
+            return "environment"
+
+        return "default"
 
 
 @lru_cache()

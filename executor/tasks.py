@@ -4,9 +4,8 @@ Celery任务定义
 import asyncio
 from celery import Celery
 from core.config import settings
-from core.logger import get_logger
+from core.logger import logger
 
-logger = get_logger(__name__)
 
 # 创建Celery应用
 celery_app = Celery(

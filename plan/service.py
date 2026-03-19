@@ -102,9 +102,13 @@ class PlanService(PlanServiceInterface):
         created_execution = await self.execution_repo.create(execution)
         logger.info(f"创建执行记录成功: execution_id={created_execution.id}, plan_id={plan_id}")
         
-        # TODO: 发送任务到Celery队列
-        # from executor.tasks import execute_test_task
-        # execute_test_task.delay(created_execution.id)
+        # 发送任务到Celery队列异步执行
+        from executor.tasks import execute_test_task
+        task = execute_test_task.delay(created_execution.id)
+
+        # 保存Celery任务ID
+        created_execution.celery_task_id = task.id
+        await self.execution_repo.update(created_execution)
         
         return ExecutionRecordResponse.model_validate(created_execution)
     

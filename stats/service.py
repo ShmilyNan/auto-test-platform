@@ -4,12 +4,8 @@
 from typing import Dict, Any, List
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import select, func, and_
-
 from stats.interfaces import StatsServiceInterface
-from core.logger import get_logger
 from core.database import async_session_maker
-
-logger = get_logger(__name__)
 
 
 class StatsService(StatsServiceInterface):

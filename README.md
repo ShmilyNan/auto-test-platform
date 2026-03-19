@@ -5,13 +5,15 @@
 ## 项目架构
 
 ### 技术栈
-- **框架**: FastAPI + Uvicorn
-- **数据库**: PostgreSQL（支持 SQLite 开发环境）
+- **框架**: FastAPI + Uvicorn + Gunicorn
+- **数据库**: PostgreSQL 15
 - **ORM**: SQLAlchemy 2.0（异步）
 - **迁移**: Alembic
+- **缓存/队列**: Redis 7
+- **任务队列**: Celery + Celery Beat
 - **认证**: JWT (python-jose)
-- **任务队列**: Celery + Redis
 - **测试框架**: pytest + Allure
+- **日志**: Loguru
 
 ### 模块划分
 
@@ -24,6 +26,7 @@
 ├── executor/          # 执行引擎：pytest集成、异步执行
 ├── report/            # 报告模块：Allure报告生成
 ├── stats/             # 统计模块：数据统计
+├── scheduler/         # 定时任务：Celery Beat调度
 └── api/v1/            # API路由层
     └── endpoints/     # 各模块端点
 ```
@@ -31,60 +34,124 @@
 ## 快速开始
 
 ### 环境要求
-- Python 3.11+
-- PostgreSQL 12+（或使用 SQLite）
-- Redis 6+（可选，用于Celery）
+- Python 3.14+
+- Docker & Docker Compose
+- Make（可选）
 
-### 安装依赖
+### 使用Docker Compose启动（推荐）
 
 ```bash
-pip install -r requirements.txt
+# 1. 克隆项目
+git clone <repository-url>
+cd autotest-platform
+
+# 2. 配置环境变量
+cp .env.example .env
+# 编辑.env文件，修改敏感配置
+
+# 3. 启动所有服务
+docker-compose up -d
+
+# 4. 查看日志
+docker-compose logs -f api
+
+# 5. 运行数据库迁移
+docker-compose exec api alembic upgrade head
 ```
 
-### 配置环境变量
+### 开发环境启动
 
-创建 `.env` 文件：
+```bash
+# 1. 安装依赖
+pip install -r requirements.txt
 
+# 2. 启动开发数据库
+make dev
+# 或
+docker-compose -f docker-compose.dev.yml up -d
+
+# 3. 配置环境变量
+cp .env.example .env
+
+# 4. 运行数据库迁移
+alembic upgrade head
+
+# 5. 启动API服务
+make run
+# 或
+uvicorn main:app --reload --host 0.0.0.0 --port 5000
+
+# 6. 启动Celery Worker（新终端）
+make worker
+# 或
+celery -A scheduler worker --loglevel=info --concurrency=4
+
+# 7. 启动Celery Beat（新终端）
+make beat
+# 或
+celery -A scheduler beat --loglevel=info
+```
+
+### 使用Make命令
+
+```bash
+make help           # 显示所有可用命令
+make install        # 安装依赖
+make dev            # 启动开发环境数据库
+make run            # 启动开发服务器
+make worker         # 启动Celery Worker
+make beat           # 启动Celery Beat
+make build          # 构建Docker镜像
+make up             # 启动生产环境
+make down           # 停止生产环境
+make test           # 运行测试
+make migrate        # 运行数据库迁移
+make clean          # 清理临时文件
+```
+
+## 配置说明
+
+### 配置文件结构
+
+项目采用分层配置管理：
+
+```
+├── config.yaml          # 应用配置（非敏感）
+├── pyproject.toml       # 项目元数据和工具配置
+├── .env                 # 环境变量（敏感信息）
+└── .env.example         # 环境变量模板
+```
+
+### 配置优先级
+
+环境变量 > .env > config.yaml > 默认值
+
+### 主要配置项
+
+#### 数据库配置（.env）
 ```env
-# 数据库配置
-DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/test_platform
+DATABASE_URL=postgresql+asyncpg://autotest_user:776462@localhost:5432/autotest_platform
+```
 
-# Redis配置
+#### Redis配置（.env）
+```env
 REDIS_URL=redis://localhost:6379/0
 CELERY_BROKER_URL=redis://localhost:6379/1
 CELERY_RESULT_BACKEND=redis://localhost:6379/2
-
-# JWT配置
-SECRET_KEY=your-secret-key-change-in-production
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-
-# 测试执行配置
-TEST_RESULTS_DIR=/tmp/test_results
-ALLURE_RESULTS_DIR=/tmp/allure_results
 ```
 
-### 数据库迁移
-
-```bash
-# 初始化数据库（首次运行）
-alembic upgrade head
+#### JWT配置（.env）
+```env
+SECRET_KEY=your-super-secret-key-change-in-production
 ```
 
-### 启动服务
-
-```bash
-# 开发环境
-uvicorn main:app --host 0.0.0.0 --port 5000 --reload
-
-# 生产环境
-gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:5000
-```
-
-### 启动Celery Worker（可选）
-
-```bash
-celery -A executor.tasks worker --loglevel=info
+#### 应用配置（config.yaml）
+```yaml
+app:
+  name: "自动化测试平台"
+  version: "1.0.0"
+  debug: false
+  environment: "production"
 ```
 
 ## API 文档
@@ -99,16 +166,10 @@ celery -A executor.tasks worker --loglevel=info
 - `POST /api/v1/auth/register` - 用户注册
 - `POST /api/v1/auth/login` - 用户登录
 
-### 用户
-- `GET /api/v1/users/` - 获取用户列表
-- `GET /api/v1/users/{user_id}` - 获取用户详情
-- `PUT /api/v1/users/{user_id}` - 更新用户信息
-
 ### 项目
 - `POST /api/v1/projects/` - 创建项目
 - `GET /api/v1/projects/` - 获取项目列表
-- `GET /api/v1/projects/{project_id}` - 获取项目详情
-- `POST /api/v1/projects/{project_id}/members` - 添加项目成员
+- `POST /api/v1/projects/{id}/members` - 添加成员
 
 ### 测试用例
 - `POST /api/v1/testcases/cases` - 创建测试用例
@@ -117,76 +178,143 @@ celery -A executor.tasks worker --loglevel=info
 
 ### 测试计划
 - `POST /api/v1/plans/` - 创建测试计划
-- `POST /api/v1/plans/{plan_id}/run` - 执行测试计划
-- `GET /api/v1/plans/{plan_id}/executions` - 获取执行记录
+- `POST /api/v1/plans/{id}/run` - 执行测试计划
+- `GET /api/v1/plans/{id}/executions` - 执行记录
 
-### 报告
+### 报告和统计
 - `GET /api/v1/reports/{execution_id}` - 获取报告
+- `GET /api/v1/stats/project/{project_id}` - 项目统计
 
-### 统计
-- `GET /api/v1/stats/project/{project_id}` - 获取项目统计
-- `GET /api/v1/stats/project/{project_id}/execution-trend` - 执行趋势
+## 定时任务
 
-## 核心特性
+系统内置以下定时任务：
 
-### 1. 模块化设计
-- 每个模块独立封装，通过接口抽象实现解耦
-- 支持未来向微服务架构平滑演进
+| 任务 | 频率 | 说明 |
+|------|------|------|
+| check-scheduled-plans | 每分钟 | 检查待执行的测试计划 |
+| cleanup-old-executions | 每小时 | 清理过期执行记录 |
+| cleanup-temp-files | 每天2:00 | 清理临时文件 |
+| generate-daily-stats | 每天1:00 | 生成每日统计 |
+| check-timeout-executions | 每5分钟 | 检查超时任务 |
 
-### 2. 异步执行
-- 使用Celery实现测试任务异步执行
-- 支持定时任务调度
+## 生产部署
 
-### 3. 测试执行引擎
-- 基于pytest的测试执行框架
-- 自动生成Allure报告
-- 支持用例断言和变量提取
+### Docker Compose部署
 
-### 4. 完整的权限管理
-- 基于JWT的身份认证
-- 项目级别的权限控制
+```bash
+# 构建并启动
+docker-compose up -d --build
+
+# 扩展API实例
+docker-compose up -d --scale api=3
+
+# 查看状态
+docker-compose ps
+
+# 查看日志
+docker-compose logs -f
+```
+
+### 水平扩展
+
+```bash
+# 扩展API服务
+docker-compose up -d --scale api=4 --no-recreate
+
+# 扩展Worker
+docker-compose up -d --scale celery-worker=4 --no-recreate
+```
+
+### Nginx配置（生产环境）
+
+```bash
+# 启动包含Nginx的生产环境
+docker-compose --profile production up -d
+```
+
+## 日志系统
+
+使用Loguru统一管理日志：
+
+```python
+from core.logger import logger
+
+logger.info("信息日志")
+logger.warning("警告日志")
+logger.error("错误日志")
+logger.exception("异常日志")  # 自动包含堆栈信息
+```
+
+日志文件位置：
+- 应用日志：`logs/app_YYYY-MM-DD.log`
+- 错误日志：`logs/error_YYYY-MM-DD.log`
 
 ## 开发指南
 
 ### 代码规范
-- 遵循 PEP 8 规范
-- 使用类型注解
-- 编写单元测试
+
+```bash
+# 格式化代码
+make format
+
+# 代码检查
+make lint
+```
 
 ### 数据库迁移
+
 ```bash
-# 创建迁移脚本
-alembic revision --autogenerate -m "description"
+# 创建迁移
+make migration
+# 输入迁移描述后自动生成
 
 # 执行迁移
-alembic upgrade head
+make migrate
+
+# 重置数据库
+make db-reset
 ```
 
-### 独立运行执行器
+### 运行测试
+
 ```bash
-# 运行测试计划
-python -m executor.runner --plan 1
-
-# 运行指定用例
-python -m executor.runner --cases 1,2,3
+make test
 ```
 
-## 部署建议
+## 监控和健康检查
 
-### Docker部署
+- 健康检查端点：`GET /health`
+- Docker健康检查：内置在Dockerfile中
+- Celery监控：`flower`（可选安装）
+
+## 故障排查
+
+### 数据库连接问题
 ```bash
-# 构建镜像
-docker build -t test-platform .
+# 检查数据库状态
+docker-compose exec postgres pg_isready
 
-# 运行容器
-docker run -p 5000:5000 test-platform
+# 查看数据库日志
+docker-compose logs postgres
 ```
 
-### 生产环境配置
-1. 使用 PostgreSQL 作为数据库
-2. 使用 Redis 作为缓存和消息队列
-3. 配置 HTTPS
-4. 使用 Supervisor 或 K8s 管理进程
+### Redis连接问题
+```bash
+# 检查Redis状态
+docker-compose exec redis redis-cli ping
+
+# 查看Redis日志
+docker-compose logs redis
+```
+
+### Celery问题
+```bash
+# 查看Worker日志
+docker-compose logs celery-worker
+
+# 查看Beat日志
+docker-compose logs celery-beat
+```
 
 ## 许可证
 

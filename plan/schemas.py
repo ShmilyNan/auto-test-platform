@@ -66,6 +66,7 @@ class ExecutionRecordResponse(BaseModel):
     status: str
     triggered_by: int
     trigger_type: str
+    celery_task_id: Optional[str] = None
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
     duration: Optional[int] = None

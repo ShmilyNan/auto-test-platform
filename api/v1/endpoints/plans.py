@@ -1,10 +1,10 @@
 """
 测试计划相关API
 """
-from datetime import timezone
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
+from core.logger import logger
 from core.database import get_session
 from core.dependencies import get_current_user_id, check_project_permission
 from plan.service import PlanService
@@ -264,18 +264,24 @@ async def cancel_execution(
         )
 
     # 更新执行状态为已取消
-    from datetime import datetime
+    from datetime import datetime, timezone
     execution.status = "cancelled"
     execution.end_time = datetime.now(timezone.utc)
     execution.error_message = "用户取消执行"
 
-    await execution_repo.update(execution)
+    # 如果有Celery任务正在运行，发送取消信号
+    if execution.celery_task_id:
+        try:
+            from executor.tasks import execute_test_task
+            from celery.result import AsyncResult
 
-    # TODO: 如果有Celery任务正在运行，发送取消信号
-    # from executor.tasks import execute_test_task
-    # task_id = execution.task_id
-    # if task_id:
-    #     execute_test_task.AsyncResult(task_id).revoke(terminate=True)
+            # 撤销任务
+            execute_test_task.AsyncResult(execution.celery_task_id).revoke(terminate=True)
+            logger.info(f"已撤销Celery任务: {execution.celery_task_id}")
+        except Exception as e:
+            logger.warning(f"撤销Celery任务失败: {e}")
+
+    await execution_repo.update(execution)
 
     return {"message": "执行已取消", "execution_id": execution_id}
 

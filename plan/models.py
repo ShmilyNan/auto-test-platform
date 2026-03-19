@@ -47,7 +47,8 @@ class ExecutionRecord(Base):
     status = Column(String(20), default="pending", nullable=False)  # pending, running, finished, failed
     triggered_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     trigger_type = Column(String(20), default="manual", nullable=False)  # manual, schedule
-    
+    celery_task_id = Column(String(100), nullable=True)  # Celery任务ID，用于取消任务
+
     # 执行时间
     start_time = Column(DateTime(timezone=True), nullable=True)
     end_time = Column(DateTime(timezone=True), nullable=True)
