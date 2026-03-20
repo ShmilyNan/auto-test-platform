@@ -68,18 +68,18 @@ class PlanService(PlanServiceInterface):
     
     async def delete_plan(self, plan_id: int) -> bool:
         """删除测试计划"""
-        plan = await self.plan_repo.get_by_id(plan_id)
+        plan = await self.plan_repo.get_by_id(plan_id, include_deleted=True)
         if not plan:
             return False
         
-        await self.plan_repo.delete(plan)
+        await self.plan_repo.soft_delete(plan)
         logger.info(f"删除测试计划成功: {plan.name}")
         
         return True
     
-    async def list_plans(self, project_id: int, skip: int = 0, limit: int = 100) -> List[TestPlanResponse]:
-        """获取测试计划列表"""
-        plans = await self.plan_repo.list_by_project(project_id, skip, limit)
+    async def list_plans(self, project_id: int, page_num: int = 1, page_size: int = 1000) -> List[TestPlanResponse]:
+        """获取测试计划列表（分页）"""
+        plans = await self.plan_repo.list_by_project(project_id, page_num, page_size)
         return [TestPlanResponse.model_validate(plan) for plan in plans]
     
     async def run_plan(self, plan_id: int, user_id: int) -> ExecutionRecordResponse:
@@ -88,7 +88,7 @@ class PlanService(PlanServiceInterface):
         plan = await self.plan_repo.get_by_id(plan_id)
         if not plan:
             raise ValueError("测试计划不存在")
-        
+
         # 创建执行记录
         execution = ExecutionRecord(
             plan_id=plan_id,
@@ -122,8 +122,9 @@ class PlanService(PlanServiceInterface):
                 results=[ExecutionResultResponse.model_validate(result) for result in results]
             )
         return None
-    
-    async def list_executions(self, plan_id: int, skip: int = 0, limit: int = 100) -> List[ExecutionRecordResponse]:
-        """获取执行记录列表"""
-        executions = await self.execution_repo.list_by_plan(plan_id, skip, limit)
+
+    async def list_executions(self, plan_id: int, page_num: int = 1, page_size: int = 1000) -> List[
+        ExecutionRecordResponse]:
+        """获取执行记录列表（分页）"""
+        executions = await self.execution_repo.list_by_plan(plan_id, page_num, page_size)
         return [ExecutionRecordResponse.model_validate(execution) for execution in executions]

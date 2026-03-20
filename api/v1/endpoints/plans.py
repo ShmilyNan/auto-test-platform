@@ -1,7 +1,7 @@
 """
 测试计划相关API
 """
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from core.logger import logger
@@ -35,8 +35,8 @@ async def create_plan(
 @router.get("/", response_model=List[TestPlanResponse])
 async def list_plans(
     project_id: int,
-    skip: int = 0,
-    limit: int = 100,
+    page_num: int = Query(default=1, ge=1, description="页码，从1开始"),
+    page_size: int = Query(default=1000, ge=1, le=10000, description="每页数量"),
     session: AsyncSession = Depends(get_session),
     current_user_id: int = Depends(get_current_user_id)
 ):
@@ -45,7 +45,7 @@ async def list_plans(
     await check_project_permission(project_id, current_user_id, session, "viewer")
 
     plan_service = PlanService(session)
-    plans = await plan_service.list_plans(project_id, skip, limit)
+    plans = await plan_service.list_plans(project_id, page_num, page_size)
     return plans
 
 
@@ -193,8 +193,8 @@ async def run_plan_sync(
 @router.get("/{plan_id}/executions", response_model=List[ExecutionRecordResponse])
 async def list_executions(
     plan_id: int,
-    skip: int = 0,
-    limit: int = 100,
+    page_num: int = Query(default=1, ge=1, description="页码，从1开始"),
+    page_size: int = Query(default=1000, ge=1, le=10000, description="每页数量"),
     session: AsyncSession = Depends(get_session),
     current_user_id: int = Depends(get_current_user_id)
 ):
@@ -211,7 +211,7 @@ async def list_executions(
     # 检查项目权限
     await check_project_permission(plan.project_id, current_user_id, session, "viewer")
 
-    executions = await plan_service.list_executions(plan_id, skip, limit)
+    executions = await plan_service.list_executions(plan_id, page_num, page_size)
     return executions
 
 

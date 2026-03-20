@@ -131,7 +131,7 @@ services:
       - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
       - SECRET_KEY_FILE=/run/secrets/secret_key
       # 非敏感配置
-      - DATABASE_HOST=postgres
+      - DATABASE_HOST=localhost
       - DATABASE_PORT=5432
       - DATABASE_USER=autotest_user
       - DATABASE_NAME=autotest_platform
@@ -219,7 +219,7 @@ services:
       - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
       - SECRET_KEY_FILE=/run/secrets/secret_key
       # 非敏感配置
-      - DATABASE_HOST=postgres
+      - DATABASE_HOST=localhost
       - DATABASE_PORT=5432
       - DATABASE_USER=autotest_user
       - DATABASE_NAME=autotest_platform
@@ -280,7 +280,7 @@ services:
       - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
       - SECRET_KEY_FILE=/run/secrets/secret_key
       # 非敏感配置
-      - DATABASE_HOST=postgres
+      - DATABASE_HOST=localhost
       - DATABASE_PORT=5432
       - DATABASE_USER=autotest_user
       - DATABASE_NAME=autotest_platform

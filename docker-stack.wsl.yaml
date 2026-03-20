@@ -24,7 +24,7 @@ services:
   # 数据库服务
   # ============================================
   postgres:
-    image: postgres:15-alpine
+    image: postgres:18.3-alpine3.23
     environment:
       POSTGRES_USER: autotest_user
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
@@ -61,7 +61,7 @@ services:
   # Redis服务
   # ============================================
   redis:
-    image: redis:7-alpine
+    image: redis:7.4-alpine
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
@@ -94,7 +94,7 @@ services:
     environment:
       - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
       - SECRET_KEY_FILE=/run/secrets/secret_key
-      - DATABASE_HOST=localhost
+      - DATABASE_HOST=postgres
       - DATABASE_PORT=5432
       - DATABASE_USER=autotest_user
       - DATABASE_NAME=autotest_platform
@@ -149,7 +149,7 @@ services:
     environment:
       - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
       - SECRET_KEY_FILE=/run/secrets/secret_key
-      - DATABASE_HOST=localhost
+      - DATABASE_HOST=postgres
       - DATABASE_PORT=5432
       - DATABASE_USER=autotest_user
       - DATABASE_NAME=autotest_platform
@@ -192,7 +192,7 @@ services:
     environment:
       - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
       - SECRET_KEY_FILE=/run/secrets/secret_key
-      - DATABASE_HOST=localhost
+      - DATABASE_HOST=postgres
       - DATABASE_PORT=5432
       - DATABASE_USER=autotest_user
       - DATABASE_NAME=autotest_platform

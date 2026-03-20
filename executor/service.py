@@ -178,12 +178,16 @@ class ExecutorService(ExecutorServiceInterface):
                 # 准备测试用例
                 test_cases = await self.prepare_test_cases(plan.id)
 
+                if not test_cases:
+                    raise ValueError(f"测试计划没有可执行的测试用例")
+
                 # 生成测试目录
                 test_dir = tempfile.mkdtemp(prefix="test_run_")
                 allure_dir = execution.allure_results_path
 
                 # 确保allure目录存在
                 os.makedirs(allure_dir, exist_ok=True)
+                logger.info(f"创建Allure结果目录: {allure_dir}")
 
                 # 生成pytest文件
                 await self.generate_pytest_files(test_cases, test_dir)
@@ -251,7 +255,7 @@ class ExecutorService(ExecutorServiceInterface):
             suite_repo = TestSuiteRepository(session)
 
             # 获取计划
-            plan = await plan_repo.get_by_id(plan_id)
+            plan = await plan_repo.get_by_id(plan_id, include_deleted=False)
             if not plan:
                 raise ValueError(f"测试计划不存在: {plan_id}")
 
@@ -260,12 +264,18 @@ class ExecutorService(ExecutorServiceInterface):
 
             # 从用例集中获取用例
             for suite_id in plan.suite_ids:
-                suite = await suite_repo.get_by_id(suite_id)
+                suite = await suite_repo.get_by_id(suite_id, include_deleted=False)
                 if suite:
                     all_case_ids.update(suite.case_ids)
 
             # 获取用例详情
-            cases = await case_repo.get_by_ids(list(all_case_ids))
+            # cases = await case_repo.get_by_ids(list(all_case_ids))
+            if not all_case_ids:
+                logger.warning(f"测试计划 {plan_id} 没有关联的测试用例")
+                return []
+
+                # 获取用例详情（不包含已删除的）
+            cases = await case_repo.get_by_ids(list(all_case_ids), include_deleted=False)
 
             # 转换为字典格式
             test_cases = []
@@ -282,7 +292,7 @@ class ExecutorService(ExecutorServiceInterface):
                     "extract": case.extract or [],
                     "timeout": case.timeout
                 })
-
+            logger.info(f"准备测试用例: plan_id={plan_id}, 用例数量={len(test_cases)}")
             return test_cases
 
     async def generate_pytest_files(self, test_cases: List[Dict[str, Any]], output_dir: str) -> str:
@@ -393,7 +403,8 @@ class ExecutorService(ExecutorServiceInterface):
         test_path = os.path.join(output_dir, "test_api.py")
         with open(test_path, "w", encoding="utf-8") as f:
             f.write(test_content)
-        
+
+        logger.info(f"生成pytest测试文件: {test_path}, 用例数量: {len(test_cases)}")
         return output_dir
     
     async def run_pytest(self, test_dir: str, allure_dir: str) -> Dict[str, Any]:
@@ -408,14 +419,20 @@ class ExecutorService(ExecutorServiceInterface):
             "-v",
             "--tb=short"
         ]
-        
+
+        logger.info(f"执行pytest命令: {' '.join(cmd)}")
+
         # 执行pytest
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True
         )
-        
+
+        logger.info(f"pytest执行完成: returncode={result.returncode}")
+        if result.stderr:
+            logger.warning(f"pytest stderr: {result.stderr}")
+
         return {
             "returncode": result.returncode,
             "stdout": result.stdout,
@@ -446,7 +463,8 @@ class ExecutorService(ExecutorServiceInterface):
                     failed += 1
                 elif status == "skipped":
                     skipped += 1
-        
+        logger.info(f"解析Allure结果: total={total}, passed={passed}, failed={failed}, skipped={skipped}")
+
         return {
             "total": total,
             "passed": passed,
@@ -545,3 +563,4 @@ class ExecutorService(ExecutorServiceInterface):
                 for result in execution_results
             ]
             await result_repo.create_batch(records)
+            logger.info(f"保存执行结果: execution_id={execution_id}, 结果数量={len(records)}")

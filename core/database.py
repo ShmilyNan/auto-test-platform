@@ -2,6 +2,7 @@
 数据库配置和会话管理
 仅支持PostgreSQL数据库
 """
+import asyncio
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import (
@@ -38,24 +39,35 @@ Base = declarative_base()
 async def init_db():
     """初始化数据库连接"""
     # 隐藏密码显示连接信息（用于日志输出）
-    # db_url_display = _mask_password(settings.DATABASE_URL)
-    db_url_display = settings.DATABASE_URL
+    db_url_display = _mask_password(settings.DATABASE_URL)
+    # db_url_display = settings.DATABASE_URL
     logger.info(f"正在连接 PostgreSQL 数据库: {db_url_display}")
-    try:
-        # 测试连接
-        async with engine.begin() as conn:
-            await conn.execute(text("SELECT 1"))
+    max_attempts = 20
+    retry_delay = 3
 
-        # 创建所有表
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+    for attempt in range(1, max_attempts + 1):
+        try:
+            # 测试连接
+            async with engine.begin() as conn:
+                await conn.execute(text("SELECT 1"))
 
-        logger.info(f"PostgreSQL 数据库连接成功: {db_url_display}")
-    except Exception as e:
-        # 连接失败时输出完整的连接信息（隐藏密码）便于排查
-        logger.error(f"数据库连接失败: {db_url_display}")
-        logger.error(f"错误详情: {e}")
-        raise
+            # 创建所有表
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+
+            logger.info(f"PostgreSQL 数据库连接成功: {db_url_display}")
+            return
+        except Exception as e:
+            if attempt == max_attempts:
+                logger.error(f"数据库连接失败: {db_url_display}")
+                logger.error(f"错误详情: {e}")
+                raise
+
+            logger.warning(
+                f"第 {attempt}/{max_attempts} 次连接数据库失败，"
+                f"{retry_delay} 秒后重试: {e}"
+            )
+            await asyncio.sleep(retry_delay)
 
 
 def _mask_password(url: str) -> str:

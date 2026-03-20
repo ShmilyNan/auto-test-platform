@@ -17,6 +17,8 @@ class User(Base):
     full_name = Column(String(100), nullable=True)
     role = Column(String(20), default="user", nullable=False)  # admin, user
     is_active = Column(Boolean, default=True, nullable=False)
+    is_deleted = Column(Boolean, default=False, nullable=False, index=True)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
     is_superuser = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

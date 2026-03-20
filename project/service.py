@@ -71,24 +71,24 @@ class ProjectService(ProjectServiceInterface):
     
     async def delete_project(self, project_id: int) -> dict:
         """删除项目"""
-        project = await self.project_repo.get_by_id(project_id)
+        project = await self.project_repo.get_by_id(project_id, include_deleted=True)
         if not project:
             raise ValueError(f"项目ID {project_id} 不存在")
 
         project_name = project.name
-        await self.project_repo.delete(project)
-        logger.info(f"删除项目成功: {project.name}")
+        await self.project_repo.soft_delete(project)
+        logger.info(f"删除项目成功（软删除）: {project.name}")
         return {
             "success": True,
             "project_id": project_id,
             "project_name": project_name,
             "message": f"删除项目成功: {project_name}",
-            "detail": "项目已被成功删除，所有关联数据已清理"
+            "detail": "项目已被成功删除"
         }
 
-    async def list_projects(self, skip: int = 0, limit: int = 100) -> List[ProjectResponse]:
-        """获取项目列表"""
-        projects = await self.project_repo.list(skip, limit)
+    async def list_projects(self, page_num: int = 1, page_size: int = 1000) -> List[ProjectResponse]:
+        """获取项目列表（分页）"""
+        projects = await self.project_repo.list(page_num, page_size)
         return [ProjectResponse.model_validate(project) for project in projects]
     
     async def list_user_projects(self, user_id: int) -> List[ProjectResponse]:

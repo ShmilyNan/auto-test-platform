@@ -68,19 +68,19 @@ class TestCaseService(TestCaseServiceInterface):
         return TestCaseResponse.model_validate(updated_case)
     
     async def delete_case(self, case_id: int) -> bool:
-        """删除测试用例"""
-        case = await self.case_repo.get_by_id(case_id)
+        """删除测试用例（软删除）"""
+        case = await self.case_repo.get_by_id(case_id, include_deleted=True)
         if not case:
             return False
-        
-        await self.case_repo.delete(case)
-        logger.info(f"删除测试用例成功: {case.name}")
+
+        await self.case_repo.soft_delete(case)
+        logger.info(f"删除测试用例成功（软删除）: {case.name}")
         
         return True
     
-    async def list_cases(self, project_id: int, skip: int = 0, limit: int = 100) -> List[TestCaseResponse]:
-        """获取测试用例列表"""
-        cases = await self.case_repo.list_by_project(project_id, skip, limit)
+    async def list_cases(self, project_id: int, page_num: int = 1, page_size: int = 1000) -> List[TestCaseResponse]:
+        """获取测试用例列表（分页）"""
+        cases = await self.case_repo.list_by_project(project_id, page_num, page_size)
         return [TestCaseResponse.model_validate(case) for case in cases]
     
     async def get_cases_by_ids(self, case_ids: List[int]) -> List[TestCaseResponse]:
@@ -127,17 +127,17 @@ class TestCaseService(TestCaseServiceInterface):
         return TestSuiteResponse.model_validate(updated_suite)
     
     async def delete_suite(self, suite_id: int) -> bool:
-        """删除测试用例集"""
-        suite = await self.suite_repo.get_by_id(suite_id)
+        """删除测试用例集（软删除）"""
+        suite = await self.suite_repo.get_by_id(suite_id, include_deleted=True)
         if not suite:
             return False
-        
-        await self.suite_repo.delete(suite)
-        logger.info(f"删除测试用例集成功: {suite.name}")
+
+        await self.suite_repo.soft_delete(suite)
+        logger.info(f"删除测试用例集成功（软删除）: {suite.name}")
         
         return True
     
-    async def list_suites(self, project_id: int, skip: int = 0, limit: int = 100) -> List[TestSuiteResponse]:
-        """获取测试用例集列表"""
-        suites = await self.suite_repo.list_by_project(project_id, skip, limit)
+    async def list_suites(self, project_id: int, page_num: int = 1, page_size: int = 1000) -> List[TestSuiteResponse]:
+        """获取测试用例集列表（分页）"""
+        suites = await self.suite_repo.list_by_project(project_id, page_num, page_size)
         return [TestSuiteResponse.model_validate(suite) for suite in suites]

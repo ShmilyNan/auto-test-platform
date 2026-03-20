@@ -1,7 +1,7 @@
 """
 项目相关API
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from core.database import get_session
@@ -31,14 +31,14 @@ async def create_project(
 
 @router.get("/", response_model=list[ProjectResponse])
 async def list_projects(
-    skip: int = 0,
-    limit: int = 100,
+    page_num: int = Query(default=1, ge=1, description="页码，从1开始"),
+    page_size: int = Query(default=1000, ge=1, le=10000, description="每页数量"),
     session: AsyncSession = Depends(get_session),
     current_user: UserResponse = Depends(get_current_user)
 ):
     """获取项目列表"""
     project_service = ProjectService(session)
-    projects = await project_service.list_projects(skip, limit)
+    projects = await project_service.list_projects(page_size, page_num)
     return projects
 
 

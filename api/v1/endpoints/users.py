@@ -1,7 +1,7 @@
 """
 用户相关API
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from core.database import get_session
 from core.dependencies import get_current_user, get_current_admin_user, get_current_user_id
@@ -40,14 +40,14 @@ async def get_user(
 
 @router.get("/", response_model=list[UserResponse])
 async def list_users(
-    skip: int = 0,
-    limit: int = 100,
+    page_num: int = Query(default=1, ge=1, description="页码，从1开始"),
+    page_size: int = Query(default=1000, ge=1, le=10000, description="每页数量"),
     session: AsyncSession = Depends(get_session),
     current_user: UserResponse = Depends(get_current_admin_user)  # 需要管理员权限
 ):
     """获取用户列表（需要管理员权限）"""
     user_service = UserService(session)
-    users = await user_service.list_users(skip, limit)
+    users = await user_service.list_users(page_num, page_size)
     return users
 
 

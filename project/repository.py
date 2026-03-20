@@ -1,9 +1,10 @@
 """
 项目数据访问层
 """
+from datetime import timezone, datetime
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from project.models import Project, ProjectMember
 
@@ -21,13 +22,12 @@ class ProjectRepository:
         await self.session.refresh(project)
         return project
     
-    async def get_by_id(self, project_id: int) -> Optional[Project]:
+    async def get_by_id(self, project_id: int, include_deleted: bool = False) -> Optional[Project]:
         """根据ID获取项目"""
-        result = await self.session.execute(
-            select(Project)
-            .options(selectinload(Project.members))
-            .where(Project.id == project_id)
-        )
+        query = select(Project).options(selectinload(Project.members)).where(Project.id == project_id)
+        if not include_deleted:
+            query = query.where(Project.is_deleted == False)
+        result = await self.session.execute(query)
         return result.scalar_one_or_none()
     
     async def update(self, project: Project) -> Project:
@@ -35,24 +35,45 @@ class ProjectRepository:
         await self.session.commit()
         await self.session.refresh(project)
         return project
-    
+
+    async def soft_delete(self, project: Project) -> bool:
+        """软删除项目"""
+        project.is_deleted = True
+        project.deleted_at = datetime.now(timezone.utc)
+        await self.session.commit()
+        return True
+
     async def delete(self, project: Project) -> bool:
-        """删除项目"""
+        """物理删除项目（保留用于彻底清理）"""
         await self.session.delete(project)
         await self.session.commit()
         return True
     
-    async def list(self, skip: int = 0, limit: int = 100) -> List[Project]:
-        """获取项目列表"""
+    async def list(self, page_num: int = 1, page_size: int = 1000) -> List[Project]:
+        """获取项目列表（分页）"""
+        offset = (page_num - 1) * page_size
         result = await self.session.execute(
-            select(Project).offset(skip).limit(limit)
+            select(Project)
+            .where(Project.is_deleted == False)
+            .offset(offset)
+            .limit(page_size)
         )
         return result.scalars().all()
+
+    async def count(self) -> int:
+        """获取项目总数"""
+        result = await self.session.execute(
+            select(func.count()).select_from(Project).where(Project.is_deleted == False)
+        )
+        return result.scalar()
     
     async def list_by_owner(self, owner_id: int) -> List[Project]:
         """获取用户拥有的项目"""
         result = await self.session.execute(
-            select(Project).where(Project.owner_id == owner_id)
+            select(Project).where(
+                Project.owner_id == owner_id,
+                Project.is_deleted == False
+            )
         )
         return result.scalars().all()
     
@@ -61,7 +82,10 @@ class ProjectRepository:
         result = await self.session.execute(
             select(Project)
             .join(ProjectMember, Project.id == ProjectMember.project_id)
-            .where(ProjectMember.user_id == user_id)
+            .where(
+                ProjectMember.user_id == user_id,
+                Project.is_deleted == False
+            )
         )
         return result.scalars().all()
 

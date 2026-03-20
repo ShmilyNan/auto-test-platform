@@ -25,7 +25,11 @@ class TestPlan(Base):
     # 执行配置
     environment = Column(String(50), nullable=True)  # dev, test, prod
     config = Column(JSON, nullable=True)  # 其他配置
-    
+
+    # 软删除
+    is_deleted = Column(Boolean, default=False, nullable=False, index=True)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
     # 元数据
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

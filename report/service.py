@@ -28,8 +28,32 @@ class ReportService(ReportServiceInterface):
             
             # 检查Allure结果目录
             allure_dir = execution.allure_results_path
-            if not allure_dir or not os.path.exists(allure_dir):
-                raise ValueError(f"Allure结果目录不存在: {allure_dir}")
+            logger.info(f"检查Allure结果目录: {allure_dir}")
+
+            if not allure_dir:
+                raise ValueError(f"执行记录没有Allure结果路径")
+
+            # 确保路径是绝对路径
+            if not os.path.isabs(allure_dir):
+                # 如果是相对路径，转换为绝对路径
+                from core.constants import PROJECT_ROOT
+                allure_dir = str(PROJECT_ROOT / allure_dir)
+                logger.info(f"转换为绝对路径: {allure_dir}")
+
+            if not os.path.exists(allure_dir):
+                # 列出可能的目录帮助调试
+                possible_dirs = []
+                if os.path.exists(settings.ALLURE_RESULTS_DIR):
+                    possible_dirs = os.listdir(settings.ALLURE_RESULTS_DIR)
+                raise ValueError(
+                    f"Allure结果目录不存在: {allure_dir}\n"
+                    f"期望目录: {settings.ALLURE_RESULTS_DIR}\n"
+                    f"现有子目录: {possible_dirs}"
+                )
+
+            # 检查目录内容
+            allure_files = os.listdir(allure_dir)
+            logger.info(f"Allure目录内容: {allure_files[:10]}...")  # 只显示前10个文件
             
             # 生成HTML报告
             report_dir = os.path.join(settings.STORAGE_PATH, "reports", f"execution_{execution_id}")
@@ -44,7 +68,8 @@ class ReportService(ReportServiceInterface):
             return {
                 "execution_id": execution_id,
                 "report_url": report_url,
-                "report_dir": report_dir
+                "report_dir": report_dir,
+                "allure_dir": allure_dir
             }
     
     async def get_report(self, execution_id: int) -> Optional[Dict[str, Any]]:
@@ -91,7 +116,9 @@ class ReportService(ReportServiceInterface):
         """生成Allure HTML报告"""
         # 确保输出目录存在
         os.makedirs(output_dir, exist_ok=True)
-        
+
+        logger.info(f"生成Allure报告: allure_dir={allure_dir}, output_dir={output_dir}")
+
         # 执行Allure命令生成报告
         cmd = [
             "allure",

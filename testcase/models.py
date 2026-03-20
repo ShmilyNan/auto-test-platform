@@ -30,7 +30,11 @@ class TestCase(Base):
     tags = Column(JSON, nullable=True)  # ["smoke", "api"]
     enabled = Column(Boolean, default=True, nullable=False)
     timeout = Column(Integer, default=30)  # 超时时间（秒）
-    
+
+    # 软删除
+    is_deleted = Column(Boolean, default=False, nullable=False, index=True)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
     # 元数据
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -49,7 +53,11 @@ class TestSuite(Base):
     name = Column(String(200), nullable=False, index=True)
     description = Column(Text, nullable=True)
     case_ids = Column(JSON, nullable=False)  # [1, 2, 3, ...]
-    
+
+    # 软删除
+    is_deleted = Column(Boolean, default=False, nullable=False, index=True)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
     # 元数据
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

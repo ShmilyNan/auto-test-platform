@@ -94,7 +94,7 @@ class UserService(UserServiceInterface):
         Raises:
             ValueError: 各种删除失败的场景
         """
-        user = await self.repository.get_by_id(user_id)
+        user = await self.repository.get_by_id(user_id, include_deleted=True)
         if not user:
             raise ValueError("用户不存在")
         if user.is_superuser:
@@ -107,16 +107,16 @@ class UserService(UserServiceInterface):
         except ValueError as e:
             raise ValueError(f"无法删除用户: {str(e)}")
 
-        # 删除用户
-        await self.repository.delete(user)
-        logger.info(f"删除用户成功: {user.username}")
+        # 软删除用户
+        await self.repository.soft_delete(user)
+        logger.info(f"删除用户成功（软删除）: {user.username}")
 
         return {
             "success": True,
             "message": "用户删除成功",
             "user_id": user_id,
             "username": user.username,
-            "detail": "用户已被成功删除，所有关联数据已清理"
+            "detail": "用户已被成功删除"
         }
 
     async def _check_user_dependencies(self, user_id: int) -> None:
@@ -134,7 +134,10 @@ class UserService(UserServiceInterface):
 
         async with self.repository.session as session:
             # 检查用户是否为项目所有者
-            stmt = select(func.count()).select_from(Project).where(Project.owner_id == user_id)
+            stmt = select(func.count()).select_from(Project).where(
+                Project.owner_id == user_id,
+                Project.is_deleted == False
+            )
             result = await session.execute(stmt)
             project_count = result.scalar()
 
@@ -142,7 +145,10 @@ class UserService(UserServiceInterface):
                 raise ValueError(f"用户是 {project_count} 个项目的所有者，请先转移项目所有权")
 
             # 检查用户创建的测试用例
-            stmt = select(func.count()).select_from(TestCase).where(TestCase.created_by == user_id)
+            stmt = select(func.count()).select_from(TestCase).where(
+                TestCase.created_by == user_id,
+                TestCase.is_deleted == False
+            )
             result = await session.execute(stmt)
             case_count = result.scalar()
 
@@ -151,7 +157,10 @@ class UserService(UserServiceInterface):
                 logger.warning(f"用户创建了 {case_count} 个测试用例")
 
             # 检查用户创建的测试计划
-            stmt = select(func.count()).select_from(TestPlan).where(TestPlan.created_by == user_id)
+            stmt = select(func.count()).select_from(TestPlan).where(
+                TestPlan.created_by == user_id,
+                TestPlan.is_deleted == False
+            )
             result = await session.execute(stmt)
             plan_count = result.scalar()
 
@@ -166,9 +175,9 @@ class UserService(UserServiceInterface):
             if execution_count > 0:
                 logger.warning(f"用户有 {execution_count} 条执行记录")
 
-    async def list_users(self, skip: int = 0, limit: int = 100) -> List[UserResponse]:
-        """获取用户列表"""
-        users = await self.repository.list(skip, limit)
+    async def list_users(self, page_num: int = 1, page_size: int = 1000) -> List[UserResponse]:
+        """获取用户列表（分页）"""
+        users = await self.repository.list(page_num, page_size)
         return [UserResponse.model_validate(user) for user in users]
 
     async def authenticate_user(self, username: str, password: str) -> Optional[UserResponse]:

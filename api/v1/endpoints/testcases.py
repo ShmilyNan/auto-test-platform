@@ -1,7 +1,7 @@
 """
 测试用例相关API
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from core.database import get_session
@@ -34,8 +34,8 @@ async def create_case(
 @router.get("/cases", response_model=List[TestCaseResponse])
 async def list_cases(
     project_id: int,
-    skip: int = 0,
-    limit: int = 100,
+    page_num: int = Query(default=1, ge=1, description="页码，从1开始"),
+    page_size: int = Query(default=1000, ge=1, le=10000, description="每页数量"),
     session: AsyncSession = Depends(get_session),
     current_user_id: int = Depends(get_current_user_id)
 ):
@@ -44,7 +44,7 @@ async def list_cases(
     await check_project_permission(project_id, current_user_id, session, "viewer")
 
     case_service = TestCaseService(session)
-    cases = await case_service.list_cases(project_id, skip, limit)
+    cases = await case_service.list_cases(project_id, page_size, page_num)
     return cases
 
 
@@ -162,8 +162,8 @@ async def create_suite(
 @router.get("/suites", response_model=List[TestSuiteResponse])
 async def list_suites(
     project_id: int,
-    skip: int = 0,
-    limit: int = 100,
+    page_num: int = Query(default=1, ge=1, description="页码，从1开始"),
+    page_size: int = Query(default=1000, ge=1, le=10000, description="每页数量"),
     session: AsyncSession = Depends(get_session),
     current_user_id: int = Depends(get_current_user_id)
 ):
@@ -172,7 +172,7 @@ async def list_suites(
     await check_project_permission(project_id, current_user_id, session, "viewer")
 
     case_service = TestCaseService(session)
-    suites = await case_service.list_suites(project_id, skip, limit)
+    suites = await case_service.list_suites(project_id, page_num, page_size)
     return suites
 
 
@@ -284,6 +284,6 @@ async def export_cases(
         ids = [int(id) for id in case_ids.split(",")]
         cases = await case_service.get_cases_by_ids(ids)
     else:
-        cases = await case_service.list_cases(project_id, limit=1000)
+        cases = await case_service.list_cases(project_id, page_size=1000)
 
     return {"cases": cases}
