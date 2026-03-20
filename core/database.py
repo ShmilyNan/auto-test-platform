@@ -1,6 +1,6 @@
 """
 数据库配置和会话管理
-支持PostgreSQL和SQLite数据库
+仅支持PostgreSQL数据库
 """
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
@@ -14,22 +14,14 @@ from sqlalchemy.orm import declarative_base
 from core.config import settings
 from core.logger import logger
 
-# 创建异步引擎 - 根据数据库类型配置参数
-engine_kwargs = {
-    "echo": settings.DB_ECHO,
-}
-
-# SQLite不支持连接池参数
-if "sqlite" not in settings.DATABASE_URL:
-    engine_kwargs.update({
-        "pool_pre_ping": settings.DB_POOL_PRE_PING,
-        "pool_size": settings.DB_POOL_SIZE,
-        "max_overflow": settings.DB_MAX_OVERFLOW,
-    })
-else:
-    engine_kwargs["connect_args"] = {"check_same_thread": False}
-
-engine = create_async_engine(settings.DATABASE_URL, **engine_kwargs)
+# 创建异步引擎 - PostgreSQL 专用配置
+engine = create_async_engine(
+    settings.DATABASE_URL,
+    echo=settings.DB_ECHO,
+    pool_pre_ping=settings.DB_POOL_PRE_PING,
+    pool_size=settings.DB_POOL_SIZE,
+    max_overflow=settings.DB_MAX_OVERFLOW,
+)
 
 # 创建异步会话工厂
 async_session_maker = async_sessionmaker(
@@ -45,23 +37,53 @@ Base = declarative_base()
 
 async def init_db():
     """初始化数据库连接"""
+    # 隐藏密码显示连接信息（用于日志输出）
+    # db_url_display = _mask_password(settings.DATABASE_URL)
+    db_url_display = settings.DATABASE_URL
+    logger.info(f"正在连接 PostgreSQL 数据库: {db_url_display}")
     try:
         # 测试连接
         async with engine.begin() as conn:
-            if "sqlite" in settings.DATABASE_URL:
-                await conn.execute(text("SELECT 1"))
-            else:
-                await conn.execute(text("SELECT 1"))
+            await conn.execute(text("SELECT 1"))
 
         # 创建所有表
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
-        db_url_display = settings.DATABASE_URL.split('@')[-1] if '@' in settings.DATABASE_URL else settings.DATABASE_URL
-        logger.info(f"数据库连接成功: {db_url_display}")
+        logger.info(f"PostgreSQL 数据库连接成功: {db_url_display}")
     except Exception as e:
-        logger.error(f"数据库连接失败: {e}")
+        # 连接失败时输出完整的连接信息（隐藏密码）便于排查
+        logger.error(f"数据库连接失败: {db_url_display}")
+        logger.error(f"错误详情: {e}")
         raise
+
+
+def _mask_password(url: str) -> str:
+    """
+    隐藏数据库URL中的密码信息
+    Args:
+        url: 数据库连接URL
+    Returns:
+        隐藏密码后的URL，格式如: postgresql+asyncpg://user:***@host:port/db
+    """
+    if '@' not in url:
+        return url
+
+    try:
+        # 分割协议和连接信息
+        # 格式: postgresql+asyncpg://user:password@host:port/database
+        protocol, rest = url.split('://', 1)
+        if ':' in rest.split('@')[0]:
+            # 有密码的情况
+            auth_part, host_part = rest.split('@', 1)
+            user = auth_part.split(':')[0]
+            return f"{protocol}://{user}:***@{host_part}"
+        else:
+            # 无密码的情况
+            return url
+    except Exception:
+        # 解析失败时返回原URL（不应该发生）
+        return url
 
 
 async def close_db():

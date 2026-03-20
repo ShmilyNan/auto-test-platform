@@ -218,15 +218,15 @@ class Settings(BaseSettings):
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # 测试执行配置
-    ALLURE_RESULTS_DIR: str = ALLURE_RESULTS_DIR
-    ALLURE_REPORT_DIR: str = ALLURE_REPORT_DIR
+    ALLURE_RESULTS_DIR: str = str(ALLURE_RESULTS_DIR)
+    ALLURE_REPORT_DIR: str = str(ALLURE_REPORT_DIR)
     MAX_CONCURRENT_EXECUTIONS: int = 5
     DEFAULT_TIMEOUT: int = DEFAULT_TIMEOUT
     MAX_TIMEOUT: int = MAX_TIMEOUT
 
     # 存储配置
     STORAGE_TYPE: str = StorageType.LOCAL.value
-    STORAGE_PATH: str = STORAGE_PATH
+    STORAGE_PATH: str = str(STORAGE_PATH)
 
     # 日志配置
     LOG_LEVEL: str = "INFO"
@@ -305,6 +305,7 @@ class Settings(BaseSettings):
                 f"postgresql+asyncpg://{self.DATABASE_USER}:{password}"
                 f"@{self.DATABASE_HOST}:{self.DATABASE_PORT}/{self.DATABASE_NAME}"
             )
+        logger.info(f"数据库连接 URL: {self.DATABASE_URL}")
 
         # 构建 Redis URL
         if not self.REDIS_URL:

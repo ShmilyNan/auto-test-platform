@@ -3,7 +3,7 @@ services:
   # 数据库服务
   # ============================================
   postgres:
-    image: postgres:latest
+    image: postgres
 #    container_name: autotest-postgres
     environment:
       POSTGRES_USER: autotest_user
@@ -29,7 +29,7 @@ services:
   # Redis服务
   # ============================================
   redis:
-    image: redis:latest
+    image: redis
 #    container_name: autotest-redis
     command: redis-server --appendonly yes
     volumes:
@@ -145,7 +145,7 @@ services:
   # Nginx反向代理（可选，用于生产环境）
   # ============================================
   nginx:
-    image: nginx:latest
+    image: nginx
 #    container_name: autotest-nginx
     ports:
       - "80:80"

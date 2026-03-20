@@ -4,7 +4,7 @@ app:
   version: "1.0.0"
   description: "模块化单体架构的自动化测试平台"
   debug: false
-  environment: "development"  # development, staging, production
+  environment: "production"  # development, staging, production
 
 # API配置
 api:

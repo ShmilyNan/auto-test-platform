@@ -5,7 +5,7 @@
 # ============================================
 # 构建阶段
 # ============================================
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
@@ -22,7 +22,7 @@ RUN pip install --no-cache-dir --user -r requirements.txt
 # ============================================
 # 生产阶段
 # ============================================
-FROM python:3.11-slim as production
+FROM python:3.11-slim AS production
 
 WORKDIR /app
 

@@ -15,7 +15,7 @@ NC='\033[0m' # No Color
 
 # 配置
 STACK_NAME="autotest"
-COMPOSE_FILE="docker-stack.yml"
+COMPOSE_FILE="docker-stack.yaml"
 SECRETS_DIR="secrets"
 SECRETS_TEMPLATE_DIR="secrets/.template"
 
