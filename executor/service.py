@@ -183,7 +183,9 @@ class ExecutorService(ExecutorServiceInterface):
 
                 # 生成测试目录
                 test_dir = tempfile.mkdtemp(prefix="test_run_")
-                allure_dir = execution.allure_results_path
+                # allure_dir = execution.allure_results_path
+                allure_subdir = execution.allure_results_path
+                allure_dir = os.path.join(settings.ALLURE_RESULTS_DIR, allure_subdir)
 
                 # 确保allure目录存在
                 os.makedirs(allure_dir, exist_ok=True)

@@ -27,33 +27,31 @@ class ReportService(ReportServiceInterface):
                 raise ValueError(f"执行记录不存在: {execution_id}")
             
             # 检查Allure结果目录
-            allure_dir = execution.allure_results_path
-            logger.info(f"检查Allure结果目录: {allure_dir}")
-
-            if not allure_dir:
+            # execution.allure_results_path 保存的是相对路径（UUID子目录名）
+            allure_subdir = execution.allure_results_path
+            if not allure_subdir:
                 raise ValueError(f"执行记录没有Allure结果路径")
 
-            # 确保路径是绝对路径
-            if not os.path.isabs(allure_dir):
-                # 如果是相对路径，转换为绝对路径
-                from core.constants import PROJECT_ROOT
-                allure_dir = str(PROJECT_ROOT / allure_dir)
-                logger.info(f"转换为绝对路径: {allure_dir}")
+            # 构建完整路径
+            allure_dir = os.path.join(settings.ALLURE_RESULTS_DIR, allure_subdir)
+            logger.info(f"检查Allure结果目录: {allure_dir}")
+            logger.info(f"ALLURE_RESULTS_DIR配置: {settings.ALLURE_RESULTS_DIR}")
+            logger.info(f"相对子目录: {allure_subdir}")
 
             if not os.path.exists(allure_dir):
                 # 列出可能的目录帮助调试
-                possible_dirs = []
-                if os.path.exists(settings.ALLURE_RESULTS_DIR):
-                    possible_dirs = os.listdir(settings.ALLURE_RESULTS_DIR)
+                base_dir = settings.ALLURE_RESULTS_DIR
+                existing_dirs = os.listdir(base_dir) if os.path.exists(base_dir) else []
                 raise ValueError(
                     f"Allure结果目录不存在: {allure_dir}\n"
-                    f"期望目录: {settings.ALLURE_RESULTS_DIR}\n"
-                    f"现有子目录: {possible_dirs}"
+                    f"基础目录: {base_dir}\n"
+                    f"期望子目录: {allure_subdir}\n"
+                    f"现有子目录: {existing_dirs}"
                 )
 
             # 检查目录内容
             allure_files = os.listdir(allure_dir)
-            logger.info(f"Allure目录内容: {allure_files[:10]}...")  # 只显示前10个文件
+            logger.info(f"Allure目录文件数量: {len(allure_files)}")
             
             # 生成HTML报告
             report_dir = os.path.join(settings.STORAGE_PATH, "reports", f"execution_{execution_id}")

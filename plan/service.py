@@ -89,18 +89,20 @@ class PlanService(PlanServiceInterface):
         if not plan:
             raise ValueError("测试计划不存在")
 
+        allure_subdir = str(uuid.uuid4())
+
         # 创建执行记录
         execution = ExecutionRecord(
             plan_id=plan_id,
-            project_id=plan.project_id,
+            # project_id=plan.project_id,
             status="pending",
             triggered_by=user_id,
             trigger_type="manual",
-            allure_results_path=f"{settings.ALLURE_RESULTS_DIR}/{uuid.uuid4()}"
+            allure_results_path=allure_subdir
         )
         
         created_execution = await self.execution_repo.create(execution)
-        logger.info(f"创建执行记录成功: execution_id={created_execution.id}, plan_id={plan_id}")
+        logger.info(f"创建执行记录成功: execution_id={created_execution.id}, plan_id={plan_id}, allure_subdir={allure_subdir}")
         
         # 发送任务到Celery队列异步执行
         from executor.tasks import execute_test_task
