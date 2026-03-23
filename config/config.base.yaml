@@ -1,11 +1,12 @@
+# ============================================
+# 基础配置 - 所有环境共享
+# ============================================
+
 # 应用配置
 app:
   name: "自动化测试平台"
   version: "1.0.0"
   description: "模块化单体架构的自动化测试平台"
-  debug: false
-  environment: "dev"  # dev, prod
-#  environment: "prod"
 
 # API配置
 api:
@@ -43,35 +44,22 @@ jwt:
 
 # 测试执行配置
 test_execution:
-  # 结果目录由 core/constants.py 统一管理
-  # ALLURE_RESULTS_DIR: output/reports/allure
-  # ALLURE_REPORT_DIR: output/reports/allure-report
   max_concurrent_executions: 5
   default_timeout: 30
   max_timeout: 600
 
 # 存储配置
 storage:
-  type: "local"  # local, oss, s3
-  # 存储路径由 core/constants.py 统一管理
-  # STORAGE_PATH: output/storage
-  # OSS配置（如果使用）
-  oss:
-    endpoint: ""
-    bucket_name: ""
-    access_key: ""
-    secret_key: ""
+  type: "local"
 
 # 日志配置
 logging:
-  level: "INFO"
   format: "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
   rotation: "100 MB"
   retention: "30 days"
   compression: "zip"
   console_output: true
   file_output: true
-  log_dir: "logs"
 
 # 定时任务配置
 schedule:

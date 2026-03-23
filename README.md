@@ -46,7 +46,7 @@ git clone <repository-url>
 cd autotest-platform
 
 # 2. 配置环境变量
-cp .env.example .env
+cp .env.dev.example .env.dev
 # 编辑.env文件，修改敏感配置
 
 # 3. 启动所有服务
@@ -71,7 +71,7 @@ make dev
 docker-compose -f docker-compose.dev.yml up -d
 
 # 3. 配置环境变量
-cp .env.example .env
+cp .env.dev.example .env.dev
 
 # 4. 运行数据库迁移
 alembic upgrade head

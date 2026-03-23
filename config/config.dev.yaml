@@ -1,0 +1,43 @@
+# ============================================
+# 开发环境配置
+# ============================================
+
+# 应用配置
+app:
+  debug: true
+
+# 数据库配置（开发环境）
+database:
+  host: localhost
+  port: 5432
+  user: autotest_user
+  name: autotest_platform
+  echo: false  # 设置为 true 可查看 SQL 语句
+
+# Redis配置（开发环境）
+redis:
+  host: localhost
+  port: 6379
+
+# Celery配置（开发环境）
+celery:
+  worker_concurrency: 2
+
+# 日志配置（开发环境）
+logging:
+  level: "DEBUG"
+  console_output: true
+  file_output: true
+  log_dir: "logs"
+
+# 测试执行配置
+test_execution:
+  max_concurrent_executions: 3
+
+# 定时任务配置
+schedule:
+  enabled: true
+
+# 限流配置（开发环境宽松一些）
+rate_limit:
+  enabled: false

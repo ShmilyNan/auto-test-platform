@@ -10,8 +10,8 @@ __pycache__/
 *.a
 /vendor
 *.egg-info/
-/.env
-.env
+/.env.dev
+.env.dev
 
 # Docker Secrets (敏感信息，禁止提交)
 secrets/*.txt

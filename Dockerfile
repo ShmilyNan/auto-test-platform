@@ -5,7 +5,7 @@
 # ============================================
 # 构建阶段
 # ============================================
-FROM python:3.11-slim AS builder
+FROM python:3.14-slim AS builder
 
 WORKDIR /app
 
@@ -22,7 +22,7 @@ RUN pip install --no-cache-dir --user -r requirements.txt
 # ============================================
 # 生产阶段
 # ============================================
-FROM python:3.11-slim AS production
+FROM python:3.14-slim AS production
 
 WORKDIR /app
 
@@ -47,7 +47,7 @@ RUN mkdir -p /app/logs /app/output/reports/allure /app/output/reports/allure-rep
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app \
-    ENVIRONMENT=production
+    ENVIRONMENT=prod
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \

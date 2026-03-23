@@ -1,0 +1,71 @@
+# ============================================
+# 生产环境配置
+# ============================================
+
+# 应用配置
+app:
+  debug: false
+
+# 数据库配置（生产环境）
+# 注意：敏感信息（密码）通过 Docker Secrets 或环境变量传入
+database:
+  host: postgres
+  port: 5432
+  user: autotest_user
+  name: autotest_platform
+  pool_size: 20
+  max_overflow: 40
+  echo: false
+
+# Redis配置（生产环境）
+redis:
+  host: redis
+  port: 6379
+
+# Celery配置（生产环境）
+celery:
+  worker_concurrency: 4
+  worker_prefetch_multiplier: 1
+  task_time_limit: 1800
+  task_soft_time_limit: 1500
+  result_expires: 86400
+
+# JWT配置（生产环境）
+jwt:
+  access_token_expire_minutes: 60
+  refresh_token_expire_days: 7
+
+# 测试执行配置
+test_execution:
+  max_concurrent_executions: 10
+  default_timeout: 30
+  max_timeout: 600
+
+# 日志配置（生产环境）
+logging:
+  level: "INFO"
+  console_output: true
+  file_output: true
+  log_dir: "/app/logs"
+  rotation: "100 MB"
+  retention: "30 days"
+
+# 定时任务配置
+schedule:
+  enabled: true
+  timezone: "Asia/Shanghai"
+
+# 分页配置
+pagination:
+  default_page_size: 20
+  max_page_size: 100
+
+# 限流配置（生产环境）
+rate_limit:
+  enabled: true
+  requests_per_minute: 120
+  burst: 20
+
+# 存储配置
+storage:
+  type: "local"

@@ -310,7 +310,7 @@ docker exec -it $(docker ps -q -f name=autotest_api) ls -la /run/secrets/
 ### 方式一：使用 .env 文件
 
 ```bash
-# .env
+# .env.dev
 POSTGRES_PASSWORD=your_password
 SECRET_KEY=your_secret_key
 ```
@@ -331,8 +331,8 @@ export SECRET_KEY=your_secret_key
 1. **导出现有环境变量**
 
 ```bash
-# 从 .env 文件提取敏感信息
-grep -E "PASSWORD|SECRET|KEY|TOKEN" .env > secrets_extract.txt
+# 从 .env.dev 文件提取敏感信息
+grep -E "PASSWORD|SECRET|KEY|TOKEN" .env.dev > secrets_extract.txt
 ```
 
 2. **创建 Secrets 文件**

@@ -142,7 +142,10 @@ async def run_plan(
 
         # 异步执行测试任务
         from executor.tasks import dispatch_test_execution
-        dispatch_test_execution(execution.id, background_tasks)
+        # dispatch_test_execution(execution.id, background_tasks)
+        dispatch_type = dispatch_test_execution(execution.id, background_tasks)
+
+        logger.info(f"测试任务已分发: execution_id={execution.id}, dispatch_type={dispatch_type}")
 
         return execution
     except ValueError as e:

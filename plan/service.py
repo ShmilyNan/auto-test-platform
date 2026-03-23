@@ -94,7 +94,7 @@ class PlanService(PlanServiceInterface):
         # 创建执行记录
         execution = ExecutionRecord(
             plan_id=plan_id,
-            # project_id=plan.project_id,
+            project_id=plan.project_id,
             status="pending",
             triggered_by=user_id,
             trigger_type="manual",
@@ -105,12 +105,12 @@ class PlanService(PlanServiceInterface):
         logger.info(f"创建执行记录成功: execution_id={created_execution.id}, plan_id={plan_id}, allure_subdir={allure_subdir}")
         
         # 发送任务到Celery队列异步执行
-        from executor.tasks import execute_test_task
-        task = execute_test_task.delay(created_execution.id)
+        # from executor.tasks import execute_test_task
+        # task = execute_test_task.delay(created_execution.id)
 
         # 保存Celery任务ID
-        created_execution.celery_task_id = task.id
-        await self.execution_repo.update(created_execution)
+        # created_execution.celery_task_id = task.id
+        # await self.execution_repo.update(created_execution)
         
         return ExecutionRecordResponse.model_validate(created_execution)
     

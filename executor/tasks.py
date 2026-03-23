@@ -63,7 +63,7 @@ def dispatch_test_execution(execution_id: int, background_tasks=None) -> str:
             return "inline"
 
 
-@celery_app.task(bind=True)
+@celery_app.task()
 def execute_test_task(execution_id: int):
     """执行测试任务"""
     import asyncio
@@ -87,7 +87,7 @@ def execute_test_task(execution_id: int):
         loop.close()
 
 
-@celery_app.task(bind=True)
+@celery_app.task()
 def generate_report_task(execution_id: int):
     """生成报告任务"""
     import asyncio

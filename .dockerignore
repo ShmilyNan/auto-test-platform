@@ -53,7 +53,7 @@ allure-report/
 logs/
 
 # Environment
-.env
+.env.dev
 .env.local
 .env.*.local
 

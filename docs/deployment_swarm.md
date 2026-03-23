@@ -36,10 +36,10 @@
 
 ```bash
 # 复制环境变量模板
-cp .env.production .env
+cp .env.dev.production .env.dev
 
 # 编辑配置
-vim .env
+vim .env.dev
 ```
 
 **必须修改的配置**：
@@ -169,7 +169,7 @@ sudo mkdir -p /data/autotest/{postgres,redis,storage,logs}
 docker network create --driver overlay --attachable autotest-network
 
 # 3. 加载环境变量
-export $(cat .env | grep -v '^#' | xargs)
+export $(cat .env.dev | grep -v '^#' | xargs)
 
 # 4. 部署服务栈
 docker stack deploy -c docker-stack.yml autotest
@@ -423,8 +423,8 @@ POSTGRES_PASSWORD=$(openssl rand -base64 32)
 SECRET_KEY=$(openssl rand -base64 32)
 
 # 更新.env文件
-sed -i "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${POSTGRES_PASSWORD}/" .env
-sed -i "s/SECRET_KEY=.*/SECRET_KEY=${SECRET_KEY}/" .env
+sed -i "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${POSTGRES_PASSWORD}/" .env.dev
+sed -i "s/SECRET_KEY=.*/SECRET_KEY=${SECRET_KEY}/" .env.dev
 ```
 
 ### 2. 配置防火墙

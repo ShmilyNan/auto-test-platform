@@ -2,7 +2,6 @@
 测试计划数据访问层
 """
 from datetime import datetime, timezone
-from http.cookiejar import offset_from_tz_string
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func

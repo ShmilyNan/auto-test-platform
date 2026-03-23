@@ -103,7 +103,7 @@ services:
       - REDIS_DB_CACHE=0
       - REDIS_DB_CELERY_BROKER=1
       - REDIS_DB_CELERY_BACKEND=2
-      - ENVIRONMENT=production
+      - ENVIRONMENT=prod
       - DEBUG=false
     secrets:
       - postgres_password
@@ -158,7 +158,7 @@ services:
       - REDIS_DB_CACHE=0
       - REDIS_DB_CELERY_BROKER=1
       - REDIS_DB_CELERY_BACKEND=2
-      - ENVIRONMENT=production
+      - ENVIRONMENT=prod
       - DEBUG=false
       - CELERY_WORKER_CONCURRENCY=2
     secrets:
@@ -201,7 +201,7 @@ services:
       - REDIS_DB_CACHE=0
       - REDIS_DB_CELERY_BROKER=1
       - REDIS_DB_CELERY_BACKEND=2
-      - ENVIRONMENT=production
+      - ENVIRONMENT=prod
       - DEBUG=false
     secrets:
       - postgres_password

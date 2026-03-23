@@ -105,10 +105,22 @@ class CompareOperator(str, Enum):
 
 
 class Environment(str, Enum):
-    """环境标识枚举"""
-    DEVELOPMENT = "development"
-    STAGING = "staging"
-    PRODUCTION = "production"
+    """环境标识枚举 - 仅支持开发和生产两个环境"""
+    DEV = "dev"
+    PROD = "prod"
+
+    @classmethod
+    def from_string(cls, value: str) -> "Environment":
+        """从字符串创建枚举值，支持多种写法"""
+        value = value.lower().strip()
+        # 开发环境的多种写法
+        if value in ("dev", "development", "develop", "local"):
+            return cls.DEV
+        # 生产环境的多种写法
+        if value in ("prod", "production", "live"):
+            return cls.PROD
+        # 默认返回开发环境
+        return cls.DEV
 
 
 class StorageType(str, Enum):

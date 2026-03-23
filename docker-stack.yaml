@@ -141,7 +141,7 @@ services:
       - REDIS_DB_CELERY_BROKER=1
       - REDIS_DB_CELERY_BACKEND=2
       # 应用配置
-      - ENVIRONMENT=production
+      - ENVIRONMENT=prod
       - DEBUG=false
       - APP_NAME=${APP_NAME:-自动化测试平台}
       - APP_VERSION=${APP_VERSION:-1.0.0}
@@ -229,7 +229,7 @@ services:
       - REDIS_DB_CELERY_BROKER=1
       - REDIS_DB_CELERY_BACKEND=2
       # 应用配置
-      - ENVIRONMENT=production
+      - ENVIRONMENT=prod
       - DEBUG=false
       - CELERY_WORKER_CONCURRENCY=4
       - CELERY_WORKER_PREFETCH_MULTIPLIER=1
@@ -290,7 +290,7 @@ services:
       - REDIS_DB_CELERY_BROKER=1
       - REDIS_DB_CELERY_BACKEND=2
       # 应用配置
-      - ENVIRONMENT=production
+      - ENVIRONMENT=prod
       - DEBUG=false
     secrets:
       - postgres_password
