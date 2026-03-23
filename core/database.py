@@ -36,6 +36,30 @@ async_session_maker = async_sessionmaker(
 Base = declarative_base()
 
 
+def _import_all_models():
+    """
+    导入所有模型，确保它们被注册到 Base.metadata
+    这个函数必须在 Base.metadata.create_all 之前调用，
+    否则 SQLAlchemy 无法识别外键引用的表。
+    """
+    # 导入所有模型（顺序很重要：先导入被依赖的表）
+    # 1. 用户表（被多个表引用）
+    from user.models import User  # noqa: F401
+
+    # 2. 项目表（被测试计划、执行记录等引用）
+    from project.models import Project, ProjectMember  # noqa: F401
+
+    # 3. 测试用例相关表
+    from testcase.models import TestCase, TestSuite  # noqa: F401
+
+    # 4. 测试计划相关表
+    from plan.models import TestPlan, ExecutionRecord, ExecutionResult  # noqa: F401
+
+    # 5. 统计表
+    from stats.models import DailyStats  # noqa: F401
+
+    logger.debug("所有模型已导入并注册到 Base.metadata")
+
 async def init_db():
     """初始化数据库连接"""
     # 隐藏密码显示连接信息（用于日志输出）
@@ -50,6 +74,8 @@ async def init_db():
             # 测试连接
             async with engine.begin() as conn:
                 await conn.execute(text("SELECT 1"))
+
+            _import_all_models()
 
             # 创建所有表
             async with engine.begin() as conn:

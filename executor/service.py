@@ -154,6 +154,8 @@ class ExecutorService(ExecutorServiceInterface):
         from plan.repository import TestPlanRepository
         from testcase.repository import TestCaseRepository
 
+        logger.info(f"[Executor] 开始执行: execution_id={execution_id}")
+
         async with async_session_maker() as session:
             execution_repo = ExecutionRecordRepository(session)
             plan_repo = TestPlanRepository(session)
@@ -162,34 +164,55 @@ class ExecutorService(ExecutorServiceInterface):
             # 获取执行记录
             execution = await execution_repo.get_by_id(execution_id)
             if not execution:
+                logger.error(f"[Executor] 执行记录不存在: execution_id={execution_id}")
                 raise ValueError(f"执行记录不存在: {execution_id}")
+            logger.info(
+                f"[Executor] 执行记录信息: plan_id={execution.plan_id}, status={execution.status}, allure_path={execution.allure_results_path}")
 
             # 更新状态为运行中
             execution.status = "running"
             execution.start_time = datetime.now(timezone.utc)
             await execution_repo.update(execution)
+            logger.info(f"[Executor] 状态已更新为 running")
 
             try:
                 # 获取计划
                 plan = await plan_repo.get_by_id(execution.plan_id)
                 if not plan:
                     raise ValueError(f"测试计划不存在: {execution.plan_id}")
+                logger.info(f"[Executor] 测试计划: id={plan.id}, name={plan.name}, suite_ids={plan.suite_ids}")
 
                 # 准备测试用例
                 test_cases = await self.prepare_test_cases(plan.id)
+                logger.info(f"[Executor] 准备的测试用例数量: {len(test_cases)}")
 
                 if not test_cases:
                     raise ValueError(f"测试计划没有可执行的测试用例")
 
                 # 生成测试目录
                 test_dir = tempfile.mkdtemp(prefix="test_run_")
+                logger.info(f"[Executor] 创建临时测试目录: {test_dir}")
                 # allure_dir = execution.allure_results_path
                 allure_subdir = execution.allure_results_path
                 allure_dir = os.path.join(settings.ALLURE_RESULTS_DIR, allure_subdir)
 
+                logger.info(f"[Executor] Allure目录配置:")
+                logger.info(f"  - ALLURE_RESULTS_DIR: {settings.ALLURE_RESULTS_DIR}")
+                logger.info(f"  - 相对路径(UUID): {allure_subdir}")
+                logger.info(f"  - 完整路径: {allure_dir}")
+
+                # 确保基础目录存在
+                if not os.path.exists(settings.ALLURE_RESULTS_DIR):
+                    logger.info(f"[Executor] 创建基础目录: {settings.ALLURE_RESULTS_DIR}")
+                    os.makedirs(settings.ALLURE_RESULTS_DIR, exist_ok=True)
+
                 # 确保allure目录存在
                 os.makedirs(allure_dir, exist_ok=True)
-                logger.info(f"创建Allure结果目录: {allure_dir}")
+                logger.info(f"[Executor] ✅ Allure结果目录创建成功: {allure_dir}")
+
+                # 验证目录确实存在
+                if not os.path.exists(allure_dir):
+                    raise RuntimeError(f"目录创建失败: {allure_dir}")
 
                 # 生成pytest文件
                 await self.generate_pytest_files(test_cases, test_dir)
@@ -246,14 +269,22 @@ class ExecutorService(ExecutorServiceInterface):
                 }
 
             except Exception as e:
+                import traceback
+
+                # 获取完整的错误堆栈
+                error_traceback = traceback.format_exc()
+                error_message = str(e)
+
+                logger.error(f"[Executor] ❌ 测试执行失败: execution_id={execution_id}")
+                logger.error(f"[Executor] 错误信息: {error_message}")
+                logger.error(f"[Executor] 错误堆栈:\n{error_traceback}")
+
                 # 更新执行记录为失败
                 execution.status = "failed"
                 execution.end_time = datetime.now(timezone.utc)
                 execution.duration = int((execution.end_time - execution.start_time).total_seconds())
-                execution.error_message = str(e)
+                execution.error_message = error_message
                 await execution_repo.update(execution)
-
-                log_error(f"测试执行失败: execution_id={execution_id}, error={str(e)}")
 
                 return {
                     "execution_id": execution_id,
@@ -266,6 +297,8 @@ class ExecutorService(ExecutorServiceInterface):
         from plan.repository import TestPlanRepository
         from testcase.repository import TestCaseRepository, TestSuiteRepository
 
+        logger.info(f"[Executor] 准备测试用例: plan_id={plan_id}")
+
         async with async_session_maker() as session:
             plan_repo = TestPlanRepository(session)
             case_repo = TestCaseRepository(session)
@@ -274,25 +307,33 @@ class ExecutorService(ExecutorServiceInterface):
             # 获取计划
             plan = await plan_repo.get_by_id(plan_id, include_deleted=False)
             if not plan:
+                logger.error(f"[Executor] 测试计划不存在: plan_id={plan_id}")
                 raise ValueError(f"测试计划不存在: {plan_id}")
+            logger.info(f"[Executor] 测试计划信息: name={plan.name}, suite_ids={plan.suite_ids}")
 
             # 收集所有用例ID
             all_case_ids = set()
 
             # 从用例集中获取用例
             for suite_id in plan.suite_ids:
+                logger.info(f"[Executor] 查询用例集: suite_id={suite_id}")
                 suite = await suite_repo.get_by_id(suite_id, include_deleted=False)
                 if suite:
+                    logger.info(f"[Executor] 用例集信息: name={suite.name}, case_ids={suite.case_ids}")
                     all_case_ids.update(suite.case_ids)
+                else:
+                    logger.warning(f"[Executor] 用例集不存在或已删除: suite_id={suite_id}")
 
             # 获取用例详情
             # cases = await case_repo.get_by_ids(list(all_case_ids))
             if not all_case_ids:
-                logger.warning(f"测试计划 {plan_id} 没有关联的测试用例")
+                logger.warning(f"[Executor] ⚠️ 测试计划 {plan_id} 没有关联的测试用例")
                 return []
+            logger.info(f"[Executor] 收集到的用例ID: {all_case_ids}")
 
                 # 获取用例详情（不包含已删除的）
             cases = await case_repo.get_by_ids(list(all_case_ids), include_deleted=False)
+            logger.info(f"[Executor] 查询到的用例数量: {len(cases)}")
 
             # 转换为字典格式
             test_cases = []

@@ -23,7 +23,8 @@ class Project(Base):
     
     # 关系
     members = relationship("ProjectMember", back_populates="project", cascade="all, delete-orphan")
-    
+    daily_stats = relationship("DailyStats", back_populates="project")
+
     def __repr__(self):
         return f"<Project(id={self.id}, name='{self.name}')>"
 

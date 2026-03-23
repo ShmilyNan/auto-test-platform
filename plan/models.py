@@ -2,6 +2,7 @@
 测试计划数据模型
 """
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, JSON
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from core.database import Base
 
@@ -46,7 +47,8 @@ class ExecutionRecord(Base):
     id = Column(Integer, primary_key=True, index=True)
     plan_id = Column(Integer, ForeignKey("test_plans.id", ondelete="CASCADE"), nullable=False, index=True)
     project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
-    
+    # project = relationship("Project", back_populates="executions")
+
     # 执行状态
     status = Column(String(20), default="pending", nullable=False)  # pending, running, finished, failed
     triggered_by = Column(Integer, ForeignKey("users.id"), nullable=False)
