@@ -5,6 +5,7 @@ import asyncio
 import argparse
 import json
 import os
+import uuid
 from typing import List, Dict, Any
 from datetime import datetime
 from executor.service import ExecutorService
@@ -29,7 +30,8 @@ class TestRunner:
         # 这里简化处理，实际应该创建执行记录
         import tempfile
         test_dir = tempfile.mkdtemp(prefix="test_run_")
-        allure_dir = os.path.join(settings.ALLURE_RESULTS_DIR, f"plan_{plan_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+        allure_subdir = str(uuid.uuid4())
+        allure_dir = os.path.join(settings.ALLURE_RESULTS_DIR, allure_subdir)
         os.makedirs(allure_dir, exist_ok=True)
 
         # 生成pytest文件
@@ -45,6 +47,7 @@ class TestRunner:
 
         return {
             "plan_id": plan_id,
+            "allure_subdir": allure_subdir,
             "allure_dir": allure_dir,
             "result": allure_result
         }

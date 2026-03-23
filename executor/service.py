@@ -216,6 +216,21 @@ class ExecutorService(ExecutorServiceInterface):
 
                 await execution_repo.update(execution)
 
+                try:
+                    from report.service import ReportService
+
+                    report_service = ReportService()
+                    report_result = await report_service.generate_report(execution_id)
+                    execution.report_url = report_result.get("report_url")
+                    logger.info(
+                        f"自动生成Allure报告完成: execution_id={execution_id}, report_url={execution.report_url}"
+                    )
+                except Exception as report_error:
+                    logger.warning(
+                        f"自动生成Allure报告失败，不影响执行结果: "
+                        f"execution_id={execution_id}, error={report_error}"
+                    )
+
                 # 清理临时文件
                 shutil.rmtree(test_dir, ignore_errors=True)
 

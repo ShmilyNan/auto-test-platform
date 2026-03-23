@@ -19,7 +19,7 @@ class ReportServiceInterface(ABC):
         pass
     
     @abstractmethod
-    async def generate_allure_html(self, allure_dir: str, output_dir: str) -> str:
+    async def generate_allure_html(self, allure_dir: str, output_dir: str, report_url: str) -> str:
         """生成Allure HTML报告"""
         pass
     

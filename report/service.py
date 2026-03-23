@@ -13,7 +13,21 @@ from core.database import async_session_maker
 
 class ReportService(ReportServiceInterface):
     """报告服务实现"""
-    
+
+    def _build_allure_dirs(self, allure_subdir: str) -> tuple[str, str]:
+        """构建 Allure 结果目录和 HTML 报告目录。"""
+        allure_dir = os.path.join(settings.ALLURE_RESULTS_DIR, allure_subdir)
+        report_dir = os.path.join(settings.ALLURE_REPORT_DIR, allure_subdir)
+        return allure_dir, report_dir
+
+    def _build_report_url(self, allure_subdir: str) -> str:
+        """构建静态报告访问地址。"""
+        base_url = f"/reports/{allure_subdir}/"
+        domain = (settings.COZE_PROJECT_DOMAIN_DEFAULT or "").rstrip("/")
+        if domain:
+            return f"{domain}{base_url}"
+        return base_url
+
     async def generate_report(self, execution_id: int) -> Dict[str, Any]:
         """生成报告"""
         from plan.repository import ExecutionRecordRepository
@@ -33,9 +47,10 @@ class ReportService(ReportServiceInterface):
                 raise ValueError(f"执行记录没有Allure结果路径")
 
             # 构建完整路径
-            allure_dir = os.path.join(settings.ALLURE_RESULTS_DIR, allure_subdir)
+            allure_dir, report_dir = self._build_allure_dirs(allure_subdir)
             logger.info(f"检查Allure结果目录: {allure_dir}")
             logger.info(f"ALLURE_RESULTS_DIR配置: {settings.ALLURE_RESULTS_DIR}")
+            logger.info(f"ALLURE_REPORT_DIR配置: {settings.ALLURE_REPORT_DIR}")
             logger.info(f"相对子目录: {allure_subdir}")
 
             if not os.path.exists(allure_dir):
@@ -54,8 +69,11 @@ class ReportService(ReportServiceInterface):
             logger.info(f"Allure目录文件数量: {len(allure_files)}")
             
             # 生成HTML报告
-            report_dir = os.path.join(settings.STORAGE_PATH, "reports", f"execution_{execution_id}")
-            report_url = await self.generate_allure_html(allure_dir, report_dir)
+            report_url = await self.generate_allure_html(
+                allure_dir,
+                report_dir,
+                self._build_report_url(allure_subdir),
+            )
             
             # 更新执行记录
             execution.report_url = report_url
@@ -110,7 +128,7 @@ class ReportService(ReportServiceInterface):
                 ]
             }
     
-    async def generate_allure_html(self, allure_dir: str, output_dir: str) -> str:
+    async def generate_allure_html(self, allure_dir: str, output_dir: str, report_url: str) -> str:
         """生成Allure HTML报告"""
         # 确保输出目录存在
         os.makedirs(output_dir, exist_ok=True)
@@ -137,20 +155,17 @@ class ReportService(ReportServiceInterface):
             
             if result.returncode != 0:
                 logger.error(f"Allure报告生成失败: {result.stderr}")
-                # 如果allure命令失败，返回原始数据目录
-                return f"/api/v1/reports/raw/{os.path.basename(allure_dir)}"
+                return report_url
             
             logger.info(f"Allure报告生成成功: {output_dir}")
-            
-            # 返回报告URL
-            return f"/api/v1/reports/{os.path.basename(output_dir)}"
+            return report_url
             
         except subprocess.TimeoutExpired:
             logger.error("Allure报告生成超时")
-            return f"/api/v1/reports/raw/{os.path.basename(allure_dir)}"
+            return report_url
         except FileNotFoundError:
-            logger.warning("Allure命令未安装，返回原始数据")
-            return f"/api/v1/reports/raw/{os.path.basename(allure_dir)}"
+            logger.warning("Allure命令未安装，返回静态报告目录地址")
+            return report_url
     
     async def archive_report(self, execution_id: int, report_dir: str) -> str:
         """归档报告"""
