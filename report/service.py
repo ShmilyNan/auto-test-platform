@@ -26,7 +26,7 @@ class ReportService(ReportServiceInterface):
 
     def _build_report_url(self, allure_subdir: str, base_url: Optional[str] = None) -> str:
         """构建静态报告访问地址。"""
-        report_path = (settings.COZE_PROJECT_DOMAIN_DEFAULT or "").rstrip("/")
+        report_path = self._build_report_path(allure_subdir)
         domain = (base_url or settings.COZE_PROJECT_DOMAIN_DEFAULT or "").rstrip("/")
         if domain:
             return f"{domain}{report_path}"
@@ -110,7 +110,14 @@ class ReportService(ReportServiceInterface):
             if execution.allure_results_path:
                 report_url = self._build_report_url(execution.allure_results_path, base_url)
             elif execution.report_url:
-                report_url = execution.report_url
+                if execution.report_url.startswith("http://") or execution.report_url.startswith("https://"):
+                    report_url = execution.report_url
+                else:
+                    domain = (base_url or settings.COZE_PROJECT_DOMAIN_DEFAULT or "").rstrip("/")
+                    if domain and execution.report_url.startswith("/"):
+                        report_url = f"{domain}{execution.report_url}"
+                    else:
+                        report_url = execution.report_url
 
             return {
                 "execution_id": execution_id,

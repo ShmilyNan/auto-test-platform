@@ -180,10 +180,41 @@ for secret_name in "${!OPTIONAL_SECRETS_MAP[@]}"; do
     create_optional_secret "$secret_name" "$file_name"
 done
 
+# Step 5: 检查启动脚本
 # ============================================
-# Step 5: 构建镜像
+echo -e "\n${YELLOW}Step 5: 检查启动脚本${NC}"
+
+REQUIRED_SCRIPTS=(
+    "scripts/start_celery_worker.sh"
+    "scripts/start_celery_beat.sh"
+    "scripts/healthcheck_celery.py"
+)
+
+MISSING_SCRIPTS=0
+for script in "${REQUIRED_SCRIPTS[@]}"; do
+    if [ -f "$script" ]; then
+        chmod +x "$script" 2>/dev/null
+        log_info "✓ $script"
+    else
+        log_error "缺少启动脚本: $script"
+        MISSING_SCRIPTS=1
+    fi
+done
+
+if [ $MISSING_SCRIPTS -eq 1 ]; then
+    log_error "缺少必要的启动脚本，请确保以下文件存在:"
+    for script in "${REQUIRED_SCRIPTS[@]}"; do
+        echo "  - $script"
+    done
+    exit 1
+fi
+
 # ============================================
-echo -e "\n${YELLOW}Step 5: 构建镜像${NC}"
+
+# ============================================
+# Step 6: 构建镜像
+# ============================================
+echo -e "\n${YELLOW}Step 6: 构建镜像${NC}"
 
 if [ -f "Dockerfile" ]; then
     log_info "构建 Docker 镜像（可能需要几分钟）..."
@@ -195,9 +226,9 @@ else
 fi
 
 # ============================================
-# Step 6: 部署服务
+# Step 7: 部署服务
 # ============================================
-echo -e "\n${YELLOW}Step 6: 部署服务栈${NC}"
+echo -e "\n${YELLOW}Step 7: 部署服务栈${NC}"
 
 if [ -f "$COMPOSE_FILE" ]; then
     log_info "使用配置文件: $COMPOSE_FILE"
@@ -210,9 +241,9 @@ docker stack deploy -c $COMPOSE_FILE $STACK_NAME
 log_info "服务部署命令已执行"
 
 # ============================================
-# Step 7: 等待服务启动
+# Step 8: 等待服务启动
 # ============================================
-echo -e "\n${YELLOW}Step 7: 等待服务启动${NC}"
+echo -e "\n${YELLOW}Step 8: 等待服务启动${NC}"
 
 log_info "等待服务启动（约 60 秒）..."
 sleep 10
@@ -234,9 +265,9 @@ for i in {1..12}; do
 done
 
 # ============================================
-# Step 8: 显示服务状态
+# Step 9: 显示服务状态
 # ============================================
-echo -e "\n${YELLOW}Step 8: 服务状态${NC}"
+echo -e "\n${YELLOW}Step 9: 服务状态${NC}"
 
 docker stack services $STACK_NAME
 
@@ -244,9 +275,9 @@ echo -e "\n${YELLOW}服务任务状态:${NC}"
 docker stack ps $STACK_NAME --format "table {{.Name}}\t{{.CurrentState}}\t{{.Error}}"
 
 # ============================================
-# Step 9: 检查是否有失败的任务
+# Step 10: 检查是否有失败的任务
 # ============================================
-echo -e "\n${YELLOW}Step 9: 错误检查${NC}"
+echo -e "\n${YELLOW}Step 10: 错误检查${NC}"
 
 FAILED=$(docker stack ps $STACK_NAME --filter desired-state=failed -q 2>/dev/null | wc -l)
 if [ "$FAILED" -gt 0 ]; then
@@ -255,16 +286,16 @@ if [ "$FAILED" -gt 0 ]; then
     docker stack ps $STACK_NAME --filter desired-state=failed --no-trunc
 
     echo -e "\n${YELLOW}查看服务日志:${NC}"
-    for svc in api postgres redis; do
+    for svc in api postgres redis celery_worker celery_beat; do
         echo "--- $svc 日志 ---"
-        docker service logs ${STACK_NAME}_${svc} --tail 20 2>/dev/null
+        docker service logs ${STACK_NAME}_${svc} --tail 30 2>/dev/null
     done
 else
     log_info "没有失败的任务"
 fi
 
 # ============================================
-# Step 10: 访问信息
+# Step 11: 访问信息
 # ============================================
 echo -e "\n${YELLOW}======================================"
 echo "部署完成"
@@ -280,6 +311,11 @@ echo "  查看服务: docker stack services $STACK_NAME"
 echo "  查看日志: docker service logs ${STACK_NAME}_api"
 echo "  查看任务: docker stack ps $STACK_NAME"
 echo "  删除服务: docker stack rm $STACK_NAME"
+echo ""
+echo "  # Celery 相关命令"
+echo "  Worker 日志: docker service logs ${STACK_NAME}_celery-worker"
+echo "  Beat 日志:   docker service logs ${STACK_NAME}_celery-beat"
 
 echo -e "\n${GREEN}故障排查:${NC}"
 echo "  运行诊断: ./scripts/diagnose_swarm.sh"
+echo "  手动健康检查: docker exec \$CONTAINER_ID python3 /app/scripts/healthcheck_celery.py"

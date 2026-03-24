@@ -49,7 +49,10 @@ ENV PATH=/root/.local/bin:$PATH
 COPY . .
 
 # 创建必要的目录
-RUN mkdir -p /app/logs /app/output/reports/allure /app/output/reports/allure-report /app/output/storage
+RUN mkdir -p /app/logs /app/output/reports/allure /app/output/reports/allure-report /app/output/storage  /app/data/celerybeat
+
+# 确保启动脚本有执行权限
+RUN chmod +x /app/scripts/*.sh 2>/dev/null || true
 
 # 环境变量
 ENV PYTHONUNBUFFERED=1 \

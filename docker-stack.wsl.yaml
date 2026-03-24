@@ -145,7 +145,8 @@ services:
   # ============================================
   celery-worker:
     image: ${DOCKER_REGISTRY:-}autotest-platform:${IMAGE_TAG:-latest}
-    command: celery -A scheduler worker --loglevel=info --concurrency=2
+    # 使用启动脚本进行依赖检查和优雅关闭
+    command: [ "/bin/bash", "/app/scripts/start_celery_worker.sh", "--concurrency=2", "--max-tasks-per-child=100" ]
     environment:
       - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
       - SECRET_KEY_FILE=/run/secrets/secret_key
@@ -161,6 +162,8 @@ services:
       - ENVIRONMENT=prod
       - DEBUG=false
       - CELERY_WORKER_CONCURRENCY=2
+      - CELERY_LOG_LEVEL=info
+      - CELERY_MAX_TASKS_PER_CHILD=100
     secrets:
       - postgres_password
       - secret_key
@@ -172,6 +175,12 @@ services:
     depends_on:
       - postgres
       - redis
+    healthcheck:
+      test: [ "CMD", "python3", "/app/scripts/healthcheck_celery.py" ]
+      interval: 60s
+      timeout: 30s
+      retries: 3
+      start_period: 60s
     deploy:
       mode: replicated
       replicas: 1
@@ -182,13 +191,19 @@ services:
         reservations:
           cpus: '0.5'
           memory: 512M
+      restart_policy:
+        condition: on-failure
+        delay: 30s
+        max_attempts: 5
+        window: 300s
 
   # ============================================
   # Celery Beat服务
   # ============================================
   celery-beat:
     image: ${DOCKER_REGISTRY:-}autotest-platform:${IMAGE_TAG:-latest}
-    command: celery -A scheduler beat --loglevel=info
+    # 使用启动脚本进行依赖检查和优雅关闭
+    command: [ "/bin/bash", "/app/scripts/start_celery_beat.sh" ]
     environment:
       - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
       - SECRET_KEY_FILE=/run/secrets/secret_key
@@ -203,16 +218,24 @@ services:
       - REDIS_DB_CELERY_BACKEND=2
       - ENVIRONMENT=prod
       - DEBUG=false
+      - CELERY_LOG_LEVEL=info
     secrets:
       - postgres_password
       - secret_key
     volumes:
       - logs:/app/logs
+      - celerybeat_data:/app/data/celerybeat
     networks:
       - autotest-network
     depends_on:
       - postgres
       - redis
+    healthcheck:
+      test: [ "CMD", "test", "-f", "/app/data/celerybeat/celerybeat.pid" ]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     deploy:
       mode: replicated
       replicas: 1
@@ -223,11 +246,17 @@ services:
         reservations:
           cpus: '0.1'
           memory: 128M
+      restart_policy:
+        condition: on-failure
+        delay: 30s
+        max_attempts: 5
+        window: 300s
 
 networks:
   autotest-network:
     driver: overlay
     attachable: true
+
 
 volumes:
   postgres_data:
@@ -237,4 +266,6 @@ volumes:
   logs:
     driver: local
   output:
+    driver: local
+  celerybeat_data:
     driver: local
