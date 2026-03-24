@@ -34,14 +34,20 @@ async_session_maker = async_sessionmaker(
 
 # 声明基类
 Base = declarative_base()
+_models_imported = False
 
 
-def _import_all_models():
+def import_all_models():
     """
     导入所有模型，确保它们被注册到 Base.metadata
     这个函数必须在 Base.metadata.create_all 之前调用，
     否则 SQLAlchemy 无法识别外键引用的表。
     """
+    global _models_imported
+
+    if _models_imported:
+        return
+
     # 导入所有模型（顺序很重要：先导入被依赖的表）
     # 1. 用户表（被多个表引用）
     from user.models import User  # noqa: F401
@@ -57,7 +63,7 @@ def _import_all_models():
 
     # 5. 统计表
     from stats.models import DailyStats  # noqa: F401
-
+    _models_imported = True
     logger.debug("所有模型已导入并注册到 Base.metadata")
 
 async def init_db():
@@ -75,7 +81,7 @@ async def init_db():
             async with engine.begin() as conn:
                 await conn.execute(text("SELECT 1"))
 
-            _import_all_models()
+            import_all_models()
 
             # 创建所有表
             async with engine.begin() as conn:
@@ -157,3 +163,8 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
             raise
         finally:
             await session.close()
+
+
+# 在模块导入阶段立即注册所有模型，确保 Celery worker 等非 init_db 路径
+# 也能在 SQLAlchemy 配置映射和解析外键时拿到完整的元数据。
+import_all_models()

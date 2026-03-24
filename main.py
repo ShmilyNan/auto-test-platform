@@ -11,9 +11,11 @@
 - Docker 部署：自动检测 COZE_PROJECT_ENV 或 ENVIRONMENT 环境变量
 """
 import argparse
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.staticfiles import StaticFiles
 from core.config import settings, reset_settings, detect_environment, Environment
 from core.database import init_db, close_db
 from core.logger import setup_logging, logger
@@ -143,6 +145,13 @@ app.add_middleware(
 # 注册API路由
 app.include_router(api_router, prefix=settings.API_PREFIX)
 
+# 挂载报告静态目录，提供 Allure HTML 报告访问
+os.makedirs(settings.ALLURE_REPORT_DIR, exist_ok=True)
+app.mount(
+    "/reports",
+    StaticFiles(directory=settings.ALLURE_REPORT_DIR, html=True),
+    name="reports",
+)
 
 @app.get("/", tags=["Root"])
 async def root():

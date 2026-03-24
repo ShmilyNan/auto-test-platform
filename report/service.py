@@ -20,15 +20,19 @@ class ReportService(ReportServiceInterface):
         report_dir = os.path.join(settings.ALLURE_REPORT_DIR, allure_subdir)
         return allure_dir, report_dir
 
-    def _build_report_url(self, allure_subdir: str) -> str:
-        """构建静态报告访问地址。"""
-        base_url = f"/reports/{allure_subdir}/"
-        domain = (settings.COZE_PROJECT_DOMAIN_DEFAULT or "").rstrip("/")
-        if domain:
-            return f"{domain}{base_url}"
-        return base_url
+    def _build_report_path(self, allure_subdir: str) -> str:
+        """构建静态报告相对访问路径。"""
+        return f"/reports/{allure_subdir}/index.html"
 
-    async def generate_report(self, execution_id: int) -> Dict[str, Any]:
+    def _build_report_url(self, allure_subdir: str, base_url: Optional[str] = None) -> str:
+        """构建静态报告访问地址。"""
+        report_path = (settings.COZE_PROJECT_DOMAIN_DEFAULT or "").rstrip("/")
+        domain = (base_url or settings.COZE_PROJECT_DOMAIN_DEFAULT or "").rstrip("/")
+        if domain:
+            return f"{domain}{report_path}"
+        return report_path
+
+    async def generate_report(self, execution_id: int, base_url: Optional[str] = None) -> Dict[str, Any]:
         """生成报告"""
         from plan.repository import ExecutionRecordRepository
         
@@ -72,11 +76,11 @@ class ReportService(ReportServiceInterface):
             report_url = await self.generate_allure_html(
                 allure_dir,
                 report_dir,
-                self._build_report_url(allure_subdir),
+                self._build_report_url(allure_subdir, base_url),
             )
             
             # 更新执行记录
-            execution.report_url = report_url
+            execution.report_url = self._build_report_path(allure_subdir)
             await execution_repo.update(execution)
             
             logger.info(f"生成报告成功: execution_id={execution_id}, report_url={report_url}")
@@ -88,7 +92,7 @@ class ReportService(ReportServiceInterface):
                 "allure_dir": allure_dir
             }
     
-    async def get_report(self, execution_id: int) -> Optional[Dict[str, Any]]:
+    async def get_report(self, execution_id: int, base_url: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """获取报告"""
         from plan.repository import ExecutionRecordRepository, ExecutionResultRepository
         
@@ -102,7 +106,12 @@ class ReportService(ReportServiceInterface):
                 return None
 
             execution_results = await execution_result_repo.list_by_execution(execution_id)
-            
+            report_url = None
+            if execution.allure_results_path:
+                report_url = self._build_report_url(execution.allure_results_path, base_url)
+            elif execution.report_url:
+                report_url = execution.report_url
+
             return {
                 "execution_id": execution_id,
                 "plan_id": execution.plan_id,
@@ -111,7 +120,7 @@ class ReportService(ReportServiceInterface):
                 "end_time": execution.end_time.isoformat() if execution.end_time else None,
                 "duration": execution.duration,
                 "summary": execution.summary,
-                "report_url": execution.report_url,
+                "report_url": report_url,
                 "test_results": [
                     {
                         "case_id": result.case_id,
@@ -130,8 +139,7 @@ class ReportService(ReportServiceInterface):
     
     async def generate_allure_html(self, allure_dir: str, output_dir: str, report_url: str) -> str:
         """生成Allure HTML报告"""
-        # 确保输出目录存在
-        os.makedirs(output_dir, exist_ok=True)
+        os.makedirs(os.path.dirname(output_dir), exist_ok=True)
 
         logger.info(f"生成Allure报告: allure_dir={allure_dir}, output_dir={output_dir}")
 
@@ -155,17 +163,21 @@ class ReportService(ReportServiceInterface):
             
             if result.returncode != 0:
                 logger.error(f"Allure报告生成失败: {result.stderr}")
-                return report_url
-            
+                raise RuntimeError(f"Allure报告生成失败:{result.stderr.strip()}")
+
+            report_index_path = os.path.join(output_dir, "index.html")
+            if not os.path.isfile(report_index_path):
+                raise RuntimeError(f"Allure报告生成后缺少首页文件: {report_index_path}")
+
             logger.info(f"Allure报告生成成功: {output_dir}")
             return report_url
             
         except subprocess.TimeoutExpired:
             logger.error("Allure报告生成超时")
-            return report_url
+            raise RuntimeError("Allure报告生成超时")
         except FileNotFoundError:
-            logger.warning("Allure命令未安装，返回静态报告目录地址")
-            return report_url
+            logger.error("Allure命令未安装，无法生成HTML报告")
+            raise RuntimeError("Allure命令未安装，无法生成HTML报告")
     
     async def archive_report(self, execution_id: int, report_dir: str) -> str:
         """归档报告"""

@@ -17,14 +17,12 @@
 4. 默认值 dev
 """
 import sys
-import argparse
 from typing import Any, Dict, Optional
-from functools import lru_cache
 from pathlib import Path
 from ruamel.yaml import YAML
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from .constants import Environment, PROJECT_ROOT
+from .constants import Environment, BASE_CONFIG_FILE, CONFIG_DIR
 from loguru import logger
 
 _yaml = YAML(typ="safe")
@@ -57,7 +55,7 @@ def detect_environment() -> Environment:
     if env_from_args:
         return Environment.from_string(env_from_args)
 
-    # 2. 检查环境变量 COZE_PROJECT_ENV（沙箱提供）
+    # 2. 检查环境变量 COZE_PROJECT_ENV
     coze_env = os.getenv("COZE_PROJECT_ENV", "").strip()
     if coze_env:
         return Environment.from_string(coze_env)
@@ -93,16 +91,12 @@ def _parse_env_from_args() -> Optional[str]:
 def read_secret(secret_name: str) -> Optional[str]:
     """
     从 Docker Secrets 文件读取敏感信息
-
     Docker Swarm 将 secrets 挂载到 /run/secrets/<secret_name>
-
     Args:
         secret_name: secret 名称
-
     Returns:
         secret 内容，如果不存在返回 None
     """
-    import os
 
     # Docker secrets 默认路径
     secret_path = Path(f"/run/secrets/{secret_name}")
@@ -121,33 +115,26 @@ def read_secret(secret_name: str) -> Optional[str]:
 def load_yaml_config(environment: Environment) -> Dict[str, Any]:
     """
     加载 YAML 配置文件
-
     加载顺序（后加载的覆盖前面的）:
     1. config/config.base.yaml（基础配置）
     2. config/config.{env}.yaml（环境特定配置）
-
     Args:
         environment: 当前环境
-
     Returns:
         合并后的配置字典
     """
     config: Dict[str, Any] = {}
 
-    # 配置目录
-    config_dir = PROJECT_ROOT / "config"
-
     # 1. 加载基础配置
-    base_config_path = config_dir / "config.base.yaml"
-    if base_config_path.exists():
-        with open(base_config_path, "r", encoding="utf-8") as f:
+    if BASE_CONFIG_FILE.exists():
+        with open(BASE_CONFIG_FILE, "r", encoding="utf-8") as f:
             base_config = _yaml.load(f) or {}
             config = _deep_merge(config, base_config)
-            logger.debug(f"加载基础配置: {base_config_path}")
+            logger.debug(f"加载基础配置: {BASE_CONFIG_FILE}")
 
     # 2. 加载环境特定配置
     env_config_name = f"config.{environment.value}.yaml"
-    env_config_path = config_dir / env_config_name
+    env_config_path = CONFIG_DIR / env_config_name
     if env_config_path.exists():
         with open(env_config_path, "r", encoding="utf-8") as f:
             env_config = _yaml.load(f) or {}
@@ -546,10 +533,7 @@ class Settings(BaseSettings):
 
     def _setup_paths(self):
         """设置路径配置（根据环境区分）"""
-        from .constants import (
-            OUTPUT_DIR, LOG_DIR, REPORT_DIR,
-            ALLURE_RESULTS_DIR, ALLURE_REPORT_DIR, STORAGE_PATH
-        )
+        from .constants import LOG_DIR, ALLURE_RESULTS_DIR, ALLURE_REPORT_DIR, STORAGE_PATH
 
         # 开发环境：使用项目目录下的相对路径
         # 生产环境：使用 /app 下的路径（Docker 容器内）
@@ -579,10 +563,8 @@ class Settings(BaseSettings):
     def get_secret_source(self, secret_name: str) -> str:
         """
         获取 secret 的来源
-
         Args:
             secret_name: secret 名称
-
         Returns:
             来源描述: "docker_secret", "environment", "default"
         """

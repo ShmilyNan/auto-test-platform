@@ -23,6 +23,7 @@ RUN pip install --no-cache-dir --user -r requirements.txt
 # 生产阶段
 # ============================================
 FROM python:3.14-slim AS production
+ARG ALLURE_VERSION=2.34.1
 
 WORKDIR /app
 
@@ -30,7 +31,14 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     curl \
+    default-jre-headless \
+    unzip \
+    ca-certificates \
+    && curl -fsSL -o /tmp/allure.zip "https://github.com/allure-framework/allure2/releases/download/${ALLURE_VERSION}/allure-${ALLURE_VERSION}.zip" \
+    && unzip /tmp/allure.zip -d /opt/ \
+    && ln -s "/opt/allure-${ALLURE_VERSION}/bin/allure" /usr/local/bin/allure \
     && rm -rf /var/lib/apt/lists/* \
+    /tmp/allure.zip \
     && apt-get clean
 
 # 从构建阶段复制依赖

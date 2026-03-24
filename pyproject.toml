@@ -2,7 +2,7 @@
 # Python 项目工具配置
 # ============================================
 # 本文件仅包含开发工具的配置，不包含项目元数据和业务配置
-# 项目元数据请查看: config.yaml
+# 项目元数据请查看: config/config.base.yaml
 # 依赖管理请查看: requirements.txt, requirements-dev.txt
 #
 # 这是 Python 工具的标准配置文件位置
@@ -141,7 +141,7 @@ output = "coverage.xml"
 # ============================================
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py314"
 select = [
     "E",   # pycodestyle errors
     "W",   # pycodestyle warnings

@@ -244,7 +244,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 # 配置文件路径
 # ========================================
 CONFIG_DIR = PROJECT_ROOT / "config"
-CONFIG_FILE = CONFIG_DIR / "config.yaml"
+BASE_CONFIG_FILE = CONFIG_DIR / "config.base.yaml"
 # ========================================
 # 测试输出文件路径
 # ========================================

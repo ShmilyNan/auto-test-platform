@@ -9,12 +9,12 @@ class ReportServiceInterface(ABC):
     """报告服务接口"""
     
     @abstractmethod
-    async def generate_report(self, execution_id: int) -> Dict[str, Any]:
+    async def generate_report(self, execution_id: int, base_url: Optional[str] = None) -> Dict[str, Any]:
         """生成报告"""
         pass
     
     @abstractmethod
-    async def get_report(self, execution_id: int) -> Optional[Dict[str, Any]]:
+    async def get_report(self, execution_id: int, base_url: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """获取报告"""
         pass
     
