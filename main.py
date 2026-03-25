@@ -127,9 +127,12 @@ app = FastAPI(
     title=settings.APP_NAME,
     description=settings.APP_DESCRIPTION,
     version=settings.APP_VERSION,
-    docs_url=settings.DOCS_URL if settings.DEBUG else None,  # 生产环境禁用文档
-    redoc_url=settings.REDOC_URL if settings.DEBUG else None,
-    openapi_url="/openapi.json" if settings.DEBUG else None,
+    # docs_url=settings.DOCS_URL if settings.DEBUG else None,  # 生产环境禁用文档
+    docs_url=settings.DOCS_URL,  # 生产环境禁用文档
+    # redoc_url=settings.REDOC_URL if settings.DEBUG else None,
+    redoc_url=settings.REDOC_URL,
+    # openapi_url="/openapi.json" if settings.DEBUG else None,
+    openapi_url="/openapi.json",
     lifespan=lifespan,
 )
 

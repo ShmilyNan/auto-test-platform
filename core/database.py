@@ -84,8 +84,25 @@ async def init_db():
             import_all_models()
 
             # 创建所有表
-            async with engine.begin() as conn:
-                await conn.run_sync(Base.metadata.create_all)
+            # 创建所有表（使用 PostgreSQL advisory lock 避免多副本并发初始化导致 DDL 竞争）
+            async with engine.connect() as conn:
+                lock_id = _schema_init_lock_id(settings.DATABASE_NAME)
+                lock_acquired = False
+                try:
+                    await conn.execute(
+                        text("SELECT pg_advisory_lock(:lock_id)"),
+                        {"lock_id": lock_id},
+                    )
+                    lock_acquired = True
+                    await conn.run_sync(Base.metadata.create_all)
+                    await conn.commit()
+                finally:
+                    if lock_acquired:
+                        await conn.execute(
+                            text("SELECT pg_advisory_unlock(:lock_id)"),
+                            {"lock_id": lock_id},
+                        )
+                        await conn.commit()
 
             logger.info(f"PostgreSQL 数据库连接成功: {db_url_display}")
             return
@@ -128,6 +145,15 @@ def _mask_password(url: str) -> str:
     except Exception:
         # 解析失败时返回原URL（不应该发生）
         return url
+
+
+def _schema_init_lock_id(database_name: str) -> int:
+    """
+    计算 schema 初始化所使用的 advisory lock id。
+    使用稳定的 31-bit 正整数，避免超出 PostgreSQL int4 范围。
+    """
+    base = f"auto-test-platform::{database_name}::schema-init"
+    return sum(ord(ch) for ch in base) % 2_147_483_647
 
 
 async def close_db():
